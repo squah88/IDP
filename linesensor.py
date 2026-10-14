@@ -7,8 +7,8 @@ import movement
 
 # Assign sensor and pins- GPIO numbers
 left_outer = Pin(2, Pin.IN)
-middle = Pin(3, Pin.IN)
-right_outer = Pin(4, Pin.IN)
+middle = Pin(4, Pin.IN)
+right_outer = Pin(5, Pin.IN)
 
 #code to read the sensors and display the readings, each reading is 0 or 1, 0=black, 1=white
 def read_sensors():
