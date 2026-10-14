@@ -1,9 +1,8 @@
 #this contains all the functions for what way the robot is turning and how it is moving
 import time
 from motor import Motor
-motor3 = Motor(dirPin=4, PWMPin=5)  # Motor 3 is controlled from Motor Driv2 #1, which is on GP4/5
-motor4 = Motor(dirPin=6, PWMPin=7)  # Motor 4 is controlled from Motor Driv2 #2, which is on GP6/7
-   
+motor3 = Motor(dirPin=4, PWMPin=5)  # motor 3 controlled from Motor Driv2 #1, which is on GP4/5
+motor4 = Motor(dirPin=7, PWMPin=6)  # motor 4 controlled from Motor Driv2 #2, which is on GP6/7
 
 def turn_left():
     motor3.Reverse()
