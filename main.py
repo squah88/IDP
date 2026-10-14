@@ -1,9 +1,7 @@
-# general idea, follow edge of a line
-# if it sees white, it turns left
-# if it sees black, it turns right
-# this means it will follow the edge of a line, keeping the line on its left side
-#will turn at corners and zig-zag along the line, but will not cross it
+import time
 
-#create function for following the edge of a line
-#create different functions for, turning around, following a line, and stopping at the end of a line
+from linesensor import follow_line
 
+while True:
+    follow_line()
+    time.sleep_ms(20)
