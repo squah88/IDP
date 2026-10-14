@@ -7,8 +7,13 @@ import movement
 
 # Assign sensor and pins- GPIO numbers
 left_outer = Pin(2, Pin.IN)
+<<<<<<< HEAD
 middle = Pin(4, Pin.IN)
 right_outer = Pin(5, Pin.IN)
+=======
+middle = Pin(3, Pin.IN)
+right_outer = Pin(8, Pin.IN)
+>>>>>>> 5c02eec10b52acb8522722b1e3b88f35cc2da0cb
 
 #code to read the sensors and display the readings, each reading is 0 or 1, 0=black, 1=white
 def read_sensors():
@@ -36,20 +41,23 @@ def read_sensors():
 def follow_line():
         LO, M, RO = read_sensors() #READ SENSOR VALUES
 
-        # if it sees white on the left side, it turns left- 110 or 100
-        if LO == 1 and RO == 0:
-            movement.turn_left()
+        # if it sees black on both sides, it moves forward
+        if LO == 0 and M == 1 and RO == 0:
+            movement.move_forward()
 
-        # if it sees black on the right side, it turns right- 001 or 011
-        elif RO == 1 and LO == 0:
+        #if it sees white on the right side, it turns right
+        elif LO == 0 and M == 1 and RO == 1:
             movement.turn_right()
 
-    
-        # if it sees black on both sides, it moves forward
-        elif LO == 0 and M == 1 and RO == 0:
-            movement.move_forward()
+        #if it sees white on the left side, it turns left
+        elif LO == 1 and M == 1 and RO == 0:
+            movement.turn_left()
 
         # if it sees white on both sides, it stops
         elif LO == 1 and M == 1 and RO == 1:
             movement.stop()
             #DECIDE AFTER
+
+        else :
+            movement.stop()
+        

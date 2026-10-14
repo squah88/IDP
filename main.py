@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 
 import time
 import movement
@@ -37,3 +38,12 @@ while True:
     if running:
         led.flash_led(10000, 1)  # flash LED many times with a 1 second interval
         linesensor.follow_line()
+=======
+import time
+
+from linesensor import follow_line
+
+while True:
+    follow_line()
+    time.sleep_ms(20)
+>>>>>>> 5c02eec10b52acb8522722b1e3b88f35cc2da0cb
