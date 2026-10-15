@@ -1,49 +1,59 @@
+#code for line sensor- this contains the code for the readings the line sensor is giving
 
+from machine import Pin
 import time
 import movement
-import linesensor
-import led
-from machine import Pin
 
+# Assign sensor and pins- GPIO numbers
+left_outer = Pin(11, Pin.IN)
+middle = Pin(12, Pin.IN)
+right_outer = Pin(13, Pin.IN)
 
-#set a power pin for sensors and led
-power = Pin(28, Pin.OUT)
+#code to read the sensors and display the readings, each reading is 0 or 1, 0=black, 1=white
+def read_sensors():
+    LO = left_outer.value()
+    M = middle.value()
+    RO = right_outer.value()
 
-#BUTTON CODE
-#set button pin to be an input, the pin pull up mean the button is high normally, and when pressed it will be 
-button = Pin(15, Pin.IN, Pin.PULL_UP)
+    # print readings in order
+    print("Left Outer:", LO, "Middle:", M, "Right Outer:", RO)
 
-#running variable to keep track of if robot is on or off, start with off
-running = False
+    return LO, M, RO
 
-#previous state variable to keep track of the button state, start with high because button is not pressed
-previous_state = 1
+# line following code- this is the main code for following a line using the line sensor readings
+# to prevent robot going off line, we need a function for every possible reading
+# L M R
+# 0 0 0 = stop- something wrong ADD FIXES
+# 0 0 1 = turn right
+# 0 1 0 = move forward
+# 0 1 1 = turn right
+# 1 0 0 = turn left
+# 1 1 0 = turn left
+# 1 0 1 = stop - something wrong ADD FIXES
+# 1 1 1 = stop- something wrong ADD FIXES
 
-#the button value is 1 when not pressed, and 0 when pressed
-#set loop that runs always using while True:
+def follow_line():
+        LO, M, RO = read_sensors() #READ SENSOR VALUES
 
-while True:
-    #set that current_state is equal to the button value
-    current_state = button.value()
-    
-    # detect a new press: released (1) to pressed (0)
-    if previous_state == 1 and current_state == 0:
-        # change running to the opposite of what it was before
-        running = not running
+        # if it sees black on both sides, it moves forward
+        if LO == 0 and M == 1 and RO == 0:
+            movement.move_forward()
 
-        #set conditions for what happens if not running, versus running
-        if not running:
-            led.led_off()
+        #if it sees white on the right side, it turns right
+        elif LO == 0 and M == 1 and RO == 1:
+            movement.turn_right()
+
+        #if it sees white on the left side, it turns left
+        elif LO == 1 and M == 1 and RO == 0:
+            movement.turn_left()
+
+        # if it sees white on both sides, it stops
+        elif LO == 1 and M == 1 and RO == 1:
             movement.stop()
-        #use else to flash the led once if running, instead of flashing it many times
-        else:
-            led.flash_led(1, 0.1) 
+            #DECIDE AFTER
 
-    #update previous_state to be equal to current_state for the next loop
-    previous_state = current_state
+        else :
+            movement.stop()
 
-    #set condition for if running
-    if running:
-        led.flash_led(1, 0.1)  # flash LED many times with a 0.1 second interval
-        linesensor.follow_line()
-
+follow_line()
+     
