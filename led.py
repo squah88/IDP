@@ -1,16 +1,14 @@
 from machine import Pin
 import time
-import movement
-import linesensor
 
 
 led = Pin(14, Pin.OUT)  # Assign GPIO 14 to the LED
 
 def led_on():
-    led.value(1)  # Turn on the LED
+    led.value(1)  # turn on the LED
 
 def led_off():
-    led.value(0)  # Turn off the LED
+    led.value(0)  # turn off the LED
 
 def flash_led(times, interval):
     #create a function to flash the led a certain number of times (times) with a certain interval (interval)
@@ -30,4 +28,5 @@ def flash_led(times, interval):
 
 #led.value(0)  # Turn off the LED after the loop ends
 #print("Runtime ended. LED turned off.")  # Print a message indicating the end of the runtime
+
 

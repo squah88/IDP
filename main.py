@@ -1,9 +1,14 @@
-<<<<<<< HEAD
 
 import time
 import movement
 import linesensor
 import led
+from machine import Pin
+
+
+#set a power pin for sensors and led
+power = Pin(28, Pin.OUT)
+
 #BUTTON CODE
 #set button pin to be an input, the pin pull up mean the button is high normally, and when pressed it will be 
 button = Pin(15, Pin.IN, Pin.PULL_UP)
@@ -20,7 +25,7 @@ previous_state = 1
 while True:
     #set that current_state is equal to the button value
     current_state = button.value()
-
+    
     # detect a new press: released (1) to pressed (0)
     if previous_state == 1 and current_state == 0:
         # change running to the opposite of what it was before
@@ -30,20 +35,14 @@ while True:
         if not running:
             led.led_off()
             movement.stop()
+        else:
+            led.flash_led(1, 0.1) 
 
     #update previous_state to be equal to current_state for the next loop
     previous_state = current_state
 
     #set condition for if running
     if running:
-        led.flash_led(10000, 1)  # flash LED many times with a 1 second interval
+        led.flash_led(1, 0.1)  # flash LED many times with a 0.1 second interval
         linesensor.follow_line()
-=======
-import time
 
-from linesensor import follow_line
-
-while True:
-    follow_line()
-    time.sleep_ms(20)
->>>>>>> 5c02eec10b52acb8522722b1e3b88f35cc2da0cb

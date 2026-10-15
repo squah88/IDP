@@ -12,6 +12,26 @@ def turn_right():
     motor3.Forward()
     motor4.Reverse()
 
+def turn_90_left():
+    motor3.Forward()
+    motor4.Forward()
+    time.sleep(1)
+    motor3.Reverse()
+    motor4.Forward()
+    time.sleep(1)
+    motor3.off()
+    motor4.off()
+
+def turn_90_right():
+    motor3.Forward()
+    motor4.Forward()
+    time.sleep(1)
+    motor4.Reverse()
+    motor3.Forward()
+    time.sleep(1)
+    motor3.off()
+    motor4.off()
+
 def move_forward():
     motor3.Forward()
     motor4.Forward()
@@ -25,28 +45,16 @@ def stop():
     motor4.off()
     
 def rotate_180_right():
-    turn_time = 15000  # adjust this value based on your robot's turning speed
-
-    while turn_time >0:
-        motor3.Forward()
-        motor4.Reverse()
-        time.sleep(0.1)  # small delay to allow the motors to turn
-        turn_time -= 0.1 #decrease the turn time by the delay amount
-
+    motor4.Reverse()
+    motor3.Forward()
+    time.sleep(2.4)
     motor3.off()
     motor4.off()
 
-def rotate_180_left(): #same code as above, just turning other way
-    turn_time = 15000  # adjust this value based on your robot's turning speed
-
-    while turn_time>0:
-        motor3.Reverse()
-        motor4.Forward()
-        time.sleep(0.1)  # small delay to allow the motors to turn
-        turn_time -= 0.1 #decrease the turn time by the delay amount
-
+def rotate_180_left():
+    motor3.Reverse
+    motor4.Forward()
+    time.sleep(2.4)
     motor3.off()
     motor4.off()
-        
-    
-    
+
