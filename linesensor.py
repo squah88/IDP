@@ -16,7 +16,7 @@ def read_sensors():
     RO = right_outer.value()
 
     # print readings in order
-    print("Left Outer:", LO, "Middle:", M, "Right Outer:", RO)
+    #print("Left Outer:", LO, "Middle:", M, "Right Outer:", RO)
 
     return LO, M, RO
 
@@ -38,22 +38,36 @@ def follow_line():
         # if it sees black on both sides, it moves forward
         if LO == 0 and M == 1 and RO == 0:
             movement.move_forward()
+            print("forward")
 
         #if it sees white on the right side, it turns right
-        elif LO == 0 and M == 1 and RO == 1:
+        elif LO == 0 and M== 0 and RO == 1:
             movement.turn_right()
+            print("right")
 
         #if it sees white on the left side, it turns left
-        elif LO == 1 and M == 1 and RO == 0:
+        elif LO == 1 and M==0 and RO == 0:
             movement.turn_left()
+            print("left")
+        
+        #junction code
+        elif LO == 1 and M==1 and RO == 0:
+            movement.turn_90_left()
+            print("junction left")
+            
+        elif LO == 0 and M==1 and RO == 1:
+            movement.turn_90_right()
+            print("junction right")
 
         # if it sees white on both sides, it stops
         elif LO == 1 and M == 1 and RO == 1:
             movement.stop()
             #DECIDE AFTER
+        
+        elif LO == 0 and M == 0 and RO == 0:
+            movement.move_forward()
+            #decide after
 
         else :
             movement.stop()
 
-follow_line()
-     
