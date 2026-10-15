@@ -16,7 +16,7 @@ class Actuator:
 
 #Test code
 def test_actuator1():
-    actuator1 = Actuator(dirPin=0, PWMPin=1)  # Actuator 1 controlled from Motor Driv1 #1, which is on GP0/1
+    #actuator1 = Actuator(dirPin=0, PWMPin=1)  # Actuator 1 controlled from Motor Driv1 #1, which is on GP0/1
 
     while True:
         print("Extending quickly")
