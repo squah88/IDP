@@ -43,6 +43,13 @@ LINE_END_MS = 300             # line must be gone this long before we decide it 
 END_MS = 800                  # at the start spot, drive forward this long then stop
 LOST_LIMIT_MS = 1500          # if no sensor sees the line for this long, stop (lost)
 
+#collection point (the red box) - red reads as 1 on all three sensors, just like white
+BAR_SKIP_MS = 200             # after the T-junction, drive this long first so we don't mistake the T's bar for the box
+BOX_CONFIRM = 3               # all three sensors must see red this many readings in a row
+BOX_EXTRA_MS = 0              # once red is found, drive this much further before stopping (0 = stop straight away)
+BOX_TIMEOUT_MS = 3000         # if we never find the red box, u-turn anyway after this long (safety)
+CLEAR_BAR_MS = 300            # after the u-turn, drive this long before counting junctions again (gets past the T's bar)
+
 step = 0                  # which instruction in ROUTE we're on next
 junction_hits = 0         # how many readings in a row have looked like a junction
 last_junction_time = 0    # when we last handled a junction
@@ -88,6 +95,52 @@ def u_turn():
     movement.rotate_180_left()
     return True
 
+#at the collection point: keep going until the sensors reach the red box, THEN u-turn
+#red reads as 1 on all three sensors, so "all three see 1" = we've reached the box
+def box_u_turn():
+    # 1. drive a little first so the sensors get off the T-junction's bar (that's also 1 1 1)
+    movement.move_forward()
+    led.wait_ms(BAR_SKIP_MS)
+
+    # 2. keep following the line until all three sensors see red
+    start = time.ticks_ms()
+    red_hits = 0
+    while red_hits < BOX_CONFIRM:
+        LO, M, RO = read_sensors()
+
+        if LO == 1 and M == 1 and RO == 1:
+            red_hits += 1          # looks like red - count it, keep driving
+        else:
+            red_hits = 0           # not red yet - keep following the line towards the box
+            if M == 1:
+                movement.move_forward()
+            elif LO == 1:
+                movement.slight_left()
+            elif RO == 1:
+                movement.slight_right()
+
+        # safety: don't drive forever if we never find it
+        if time.ticks_diff(time.ticks_ms(), start) > BOX_TIMEOUT_MS:
+            print("Never found the red box - u-turning anyway")
+            break
+
+        led.wait_ms(10)   # same pace as the main loop, and keeps the LED flashing
+
+    # 3. optionally go a tiny bit further onto the red, then stop
+    if BOX_EXTRA_MS > 0:
+        movement.move_forward()
+        led.wait_ms(BOX_EXTRA_MS)
+    movement.stop()
+    print("At the red box - u-turn")
+
+    # 4. turn round
+    movement.rotate_180_left()
+
+    # 5. drive forward a bit so we don't count the T's bar as the next junction on the way back
+    movement.move_forward()
+    led.wait_ms(CLEAR_BAR_MS)
+    return True
+
 #look up the next instruction in route and do it
 def handle_junction():
     #returns True to keep going, False to stop
@@ -118,7 +171,7 @@ def handle_junction():
     elif action == "left" or action == "right":
         return turn(action)
     elif action == "junction_u_turn":
-        return u_turn()
+        return box_u_turn()
     elif action == "end":
         movement.move_forward()
         led.wait_ms(END_MS)
