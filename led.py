@@ -19,6 +19,25 @@ def flash_led(times, interval):
         led_off()
         time.sleep(interval)
 
+#a better way to flash the led is to use a timer so we don't have to wait for the sleep to finish before doing other things
+last_toggle = 0
+def update_flash():
+    global last_toggle    #global ensures we can access the variable outside of this function
+    now = time.ticks_ms()   #current time in milliseconds
+    if time.ticks_diff(now, last_toggle) >= 250:  #has 250 ms passed?
+        led.toggle()        #flips on or off
+        last_toggle = now   #remember when we flipped
+
+#function to wait for a certain number of ms but also update the led flash so it doesn't stop flashing
+#basically a better version of time.sleep
+def wait_ms(ms):
+    #wait for a certain number of milliseconds but also update the led flash so it doesn't stop flashing
+    start = time.ticks_ms()
+    while time.ticks_diff(time.ticks_ms(), start) < ms:
+        update_flash()  #update the led flash while waiting
+        time.sleep_ms(10)  #sleep for a short time to avoid busy waiting
+
+
 #runtime = 5000
 #while runtime > 0:
  #   led.value(button.value())  # Set LED state based on button state
