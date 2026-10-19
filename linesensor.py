@@ -32,11 +32,17 @@ ROUTE = [
 
 #####TUNING NUMBERS - change these on the table
 JUNCTION_CONFIRM = 3          # junction must be seen this many readings in a row (stops false alarms)
+MISSED_CORNER_MS = 150        # if the line vanishes this long when the next instruction is a turn, assume we just missed a corner
+#which junction numbers (from the ROUTE comments) are CORNERS - places where the line ENDS and turns
+#the missed-corner backup ONLY works at these, never at T-junctions
+CORNERS = [2, 12]             # 2 and 12 = the bottom-right corner (on the way out and on the way back)
 JUNCTION_COOLDOWN_MS = 500    # after a junction, ignore new junctions for this long (stops double counting)
+START_IGNORE_MS = 1500        # when the route starts, ignore junctions for this long (so the centre spot isn't counted)
 #sensor-based turning
 DRIVE_PAST_MS = 800           # drive forward this long before a 90 turn, so the WHEELS are over the junction
 SPIN_MIN_MS = 150             # always spin at least this long before looking for the line
 SPIN_MIN_180_MS = 300         # same for 180 turns
+SPIN_EXTRA_MS = 150           # after the middle sensor finds the line, keep spinning this long so it ends up ON the line, not at its edge
 STRAIGHT_MS = 300             # drive forward this long to get past a junction we're going straight over
 TURN_TIMEOUT_MS = 4000        # give up a turn if no line found after this long (safety)
 LINE_END_MS = 300             # line must be gone this long before we decide it has really ended
@@ -45,7 +51,7 @@ LOST_LIMIT_MS = 1500          # if no sensor sees the line for this long, stop (
 #collection point (the red box) - red reads as 1 on all three sensors, just like white
 BAR_SKIP_MS = 200             # after the T-junction, drive this long first so we don't mistake the T's bar for the box
 BOX_CONFIRM = 3               # all three sensors must see red this many readings in a row
-BOX_EXTRA_MS = 0              # once red is found, drive this much further before stopping (0 = stop straight away)
+BOX_EXTRA_MS = 600              # once red is found, drive this much further before stopping (0 = stop straight away)
 BOX_TIMEOUT_MS = 3000         # if we never find the red box, u-turn anyway after this long (safety)
 CLEAR_BAR_MS = 0              # after the u-turn, drive this long before counting junctions again (raise if it counts the T's bar)
 
@@ -70,7 +76,9 @@ def reset_route():
     global step, junction_hits, last_junction_time, lost_since
     step = 0
     junction_hits = 0
-    last_junction_time = time.ticks_ms()   # also makes it ignore the centre spot it starts on
+    # pretend the last junction was a bit in the FUTURE, so the cooldown lasts START_IGNORE_MS at the start
+    # (ticks_add is the safe way to add to a ticks_ms time)
+    last_junction_time = time.ticks_add(time.ticks_ms(), START_IGNORE_MS - JUNCTION_COOLDOWN_MS)
     lost_since = None
 
 #what's the next instruction on the list? (None if the list is finished)
@@ -111,7 +119,10 @@ def spin_to_line(direction, min_ms):
             print("Turn failed - couldn't find the line")
             return False
 
-    # 5. found it - stop spinning so we don't overshoot, line following takes over from here
+    # 5. found it - spin a tiny bit more so we end up in the middle of the line, not just its edge
+    led.wait_ms(SPIN_EXTRA_MS)
+
+    # 6. stop spinning, line following takes over from here
     movement.stop()
     return True
 
@@ -223,48 +234,73 @@ def handle_junction():
 # 0 1 0 = on the line -> move forward
 # 1 0 0 = line is to the left -> slight left
 # 0 0 1 = line is to the right -> slight right
-# 1 1 0 / 0 1 1 / 1 1 1 = right / left / junction -> do the next thing in ROUTE
+# 1 1 0 / 0 1 1 = EITHER a junction OR just a wobble (line under two sensors) -> steer, and only
+#                 count it as a junction if it lasts AND it's on the side the route is turning to
+# 1 1 1 = junction (or crossroad) -> do the next thing in ROUTE
 # 0 0 0 = can't see the line -> keep going for a moment, then end_u_turn or stop
 # called once every time round the main loop. Returns True to keep going, False when it's time to stop.
+
+#does this junction have a line on the side the route is about to turn to?
+#a LEFT turn needs a line on the left, a RIGHT turn needs a line on the right
+#this stops a wobble (e.g. 0 1 1) being mistaken for a left corner
+def side_matches(LO, RO):
+    action = next_action()
+    if action == "left":
+        return LO == 1
+    elif action == "right":
+        return RO == 1
+    else:
+        return True    # straight / u-turn / end - any junction pattern is fine
+
+
+#small steering corrections to stay on the line
+#returns True if any sensor can see the line, False if all three see black
+def steer(LO, M, RO):
+    if M == 1 and LO == 1 and RO == 0:
+        movement.slight_left()     # line is under the middle AND left -> robot has drifted right
+    elif M == 1 and RO == 1 and LO == 0:
+        movement.slight_right()    # line is under the middle AND right -> robot has drifted left
+    elif M == 1:
+        movement.move_forward()    # centred (or all three on white) -> straight
+    elif LO == 1:
+        movement.slight_left()
+    elif RO == 1:
+        movement.slight_right()
+    else:
+        return False               # can't see the line at all
+    return True
+
 
 #updated function to follow the line
 def follow_line():
     global step, junction_hits, last_junction_time, lost_since
- 
+
     LO, M, RO = read_sensors() #READ SENSOR VALUES
     now = time.ticks_ms()
- 
-    #is this a junction
-    at_junction = (M == 1) and (LO == 1 or RO == 1)
+
+    #is this a junction - middle on the line, a side sensor on a line, AND on the side the route needs
+    at_junction = (M == 1) and (LO == 1 or RO == 1) and side_matches(LO, RO)
     cooled_down = time.ticks_diff(now, last_junction_time) > JUNCTION_COOLDOWN_MS
- 
+
     if at_junction and cooled_down:
         junction_hits += 1
         if junction_hits >= JUNCTION_CONFIRM:     #seen it enough times in a row so its real
             junction_hits = 0
+            print("Junction seen - sensors were", LO, M, RO)   # DEBUG: shows WHY it thought this was a junction
             keep_going = handle_junction()
             last_junction_time = time.ticks_ms()
             lost_since = None
             return keep_going
-        return True    #not confirmed yet so keep doing what we were doing
+        #not confirmed yet - KEEP STEERING while we check
+        #if it's just a wobble, steering fixes it and the pattern goes away before it's confirmed
+        steer(LO, M, RO)
+        return True
     junction_hits = 0  #pattern broken, start counting again
- 
+
     #normal line following
-    if M == 1:
-        #middle sees the line so straight
-        movement.move_forward()
-        lost_since = None
- 
-    elif LO == 1:
-        #steer left if robot drifts right
-        movement.slight_left()
-        lost_since = None
- 
-    elif RO == 1:
-        #steer right if robot drifts left
-        movement.slight_right()
-        lost_since = None
- 
+    if steer(LO, M, RO):
+        lost_since = None     # we can see the line
+
     else:
         #all black so we can't see the line
         #keep doing whatever we were doing and work out how long it's been
@@ -280,7 +316,23 @@ def follow_line():
             last_junction_time = time.ticks_ms()
             lost_since = None
             return keep_going
- 
+
+        #BACKUP FOR CORNERS: the next instruction is a turn, but the line just vanished
+        #-> we probably drove past a corner without noticing, so do the turn now
+        #(at a corner the line ENDS, so losing it is a good sign that's where we are)
+        #only if: the NEXT junction is a corner, AND we're not still settling after the last turn
+        action = next_action()
+        next_is_corner = (step + 1) in CORNERS
+        cooled_down = time.ticks_diff(now, last_junction_time) > JUNCTION_COOLDOWN_MS
+        if next_is_corner and cooled_down and (action == "left" or action == "right") and gone_for > MISSED_CORNER_MS:
+            step += 1
+            print("Junction", step, "->", action, "(missed the corner, turning now)")
+            movement.stop()
+            keep_going = spin_to_line(action, SPIN_MIN_MS)   # no driving forward - we're already past it
+            last_junction_time = time.ticks_ms()
+            lost_since = None
+            return keep_going
+
         #otherwise its probably lost
         if gone_for > LOST_LIMIT_MS:
             movement.stop()
@@ -288,4 +340,3 @@ def follow_line():
             return False
  
     return True
-

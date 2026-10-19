@@ -21,7 +21,7 @@ def spin_left(speed=50):
 def spin_right(speed=50):
     motor3.Forward(speed)
     motor4.Reverse(speed)
-
+    
 def turn_90_left():
     motor3.Forward()
     motor4.Forward()
@@ -67,3 +67,10 @@ def rotate_180_left():
     time.sleep(2.4)
     motor3.off()
     motor4.off()
+
+#turn_90_left()
+#turn_90_right()
+#motor3.off()
+#motor4.off()
+#motor3.Forward()
+#motor4.Forward()
