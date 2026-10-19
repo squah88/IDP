@@ -33,22 +33,21 @@ ROUTE = [
 #####TUNING NUMBERS - change these on the table
 JUNCTION_CONFIRM = 3          # junction must be seen this many readings in a row (stops false alarms)
 JUNCTION_COOLDOWN_MS = 500    # after a junction, ignore new junctions for this long (stops double counting)
-#These should make turning more precise but will implement later
-#DRIVE_PAST_MS = 800           # drive forward this long before turning, so the WHEELS are over the junction
-#SPIN_SKIP_MS = 400            # 90 turns: spin this long before looking for the new line (to get off the old one)
-#SPIN_SKIP_180_MS = 900        # 180 turns: same idea but longer - roughly the time a 90 spin takes
+#sensor-based turning
+DRIVE_PAST_MS = 800           # drive forward this long before a 90 turn, so the WHEELS are over the junction
+SPIN_MIN_MS = 150             # always spin at least this long before looking for the line
+SPIN_MIN_180_MS = 300         # same for 180 turns
 STRAIGHT_MS = 300             # drive forward this long to get past a junction we're going straight over
 TURN_TIMEOUT_MS = 4000        # give up a turn if no line found after this long (safety)
 LINE_END_MS = 300             # line must be gone this long before we decide it has really ended
 END_MS = 800                  # at the start spot, drive forward this long then stop
 LOST_LIMIT_MS = 1500          # if no sensor sees the line for this long, stop (lost)
-
 #collection point (the red box) - red reads as 1 on all three sensors, just like white
 BAR_SKIP_MS = 200             # after the T-junction, drive this long first so we don't mistake the T's bar for the box
 BOX_CONFIRM = 3               # all three sensors must see red this many readings in a row
 BOX_EXTRA_MS = 0              # once red is found, drive this much further before stopping (0 = stop straight away)
 BOX_TIMEOUT_MS = 3000         # if we never find the red box, u-turn anyway after this long (safety)
-CLEAR_BAR_MS = 300            # after the u-turn, drive this long before counting junctions again (gets past the T's bar)
+CLEAR_BAR_MS = 0              # after the u-turn, drive this long before counting junctions again (raise if it counts the T's bar)
 
 step = 0                  # which instruction in ROUTE we're on next
 junction_hits = 0         # how many readings in a row have looked like a junction
@@ -81,19 +80,54 @@ def next_action():
     else:
         return None
 
-#for now use these then a more precise turn later
-#returns True to keep going (a timed turn can't tell if it failed, so it always says True)
-def turn(direction):
+#spin until the middle sensor finds a line - works however fast or slow the motors are
+#returns True if it found the line, False if it gave up
+def spin_to_line(direction, min_ms):
+    # 1. start spinning
     if direction == "left":
-        movement.turn_90_left()
+        movement.spin_left()
     else:
-        movement.turn_90_right()
+        movement.spin_right()
+
+    # 2. always spin for a moment first
+    led.wait_ms(min_ms)
+
+    start = time.ticks_ms()
+
+    # 3. if the middle sensor is still on something white (the old line, or the red box),
+    #    keep spinning until it's OFF it - otherwise we'd "find" the line we're already on
+    while middle.value() == 1:
+        led.update_flash()
+        if time.ticks_diff(time.ticks_ms(), start) > TURN_TIMEOUT_MS:
+            movement.stop()
+            print("Turn failed - never got off the old line")
+            return False
+
+    # 4. now keep spinning until the middle sensor finds the NEW line
+    while middle.value() == 0:
+        led.update_flash()
+        if time.ticks_diff(time.ticks_ms(), start) > TURN_TIMEOUT_MS:
+            movement.stop()
+            print("Turn failed - couldn't find the line")
+            return False
+
+    # 5. found it - stop spinning so we don't overshoot, line following takes over from here
+    movement.stop()
     return True
- 
- 
+
+
+#90 turn at a junction
+def turn(direction):
+    # drive forward first so the wheels (not just the sensors) are over the junction
+    movement.move_forward()
+    led.wait_ms(DRIVE_PAST_MS)
+    return spin_to_line(direction, SPIN_MIN_MS)
+
+
+#180 turn on the spot (no driving forward first)
 def u_turn():
-    movement.rotate_180_left()
-    return True
+    return spin_to_line("left", SPIN_MIN_180_MS)
+
 
 #at the collection point: keep going until the sensors reach the red box, THEN u-turn
 #red reads as 1 on all three sensors, so "all three see 1" = we've reached the box
@@ -133,12 +167,14 @@ def box_u_turn():
     movement.stop()
     print("At the red box - u-turn")
 
-    # 4. turn round
-    movement.rotate_180_left()
+    # 4. turn round until the middle sensor finds the line behind us
+    if not u_turn():
+        return False
 
     # 5. drive forward a bit so we don't count the T's bar as the next junction on the way back
-    movement.move_forward()
-    led.wait_ms(CLEAR_BAR_MS)
+    if CLEAR_BAR_MS > 0:
+        movement.move_forward()
+        led.wait_ms(CLEAR_BAR_MS)
     return True
 
 #look up the next instruction in route and do it
@@ -171,7 +207,7 @@ def handle_junction():
     elif action == "left" or action == "right":
         return turn(action)
     elif action == "junction_u_turn":
-        return box_u_turn()
+        return box_u_turn()     # go up to the red box first, then u-turn
     elif action == "end":
         movement.move_forward()
         led.wait_ms(END_MS)
@@ -252,4 +288,4 @@ def follow_line():
             return False
  
     return True
- 
+
