@@ -1,4 +1,8 @@
 #line sensors + route following
+#4 sensors in a row at the front:  [OL]   [IL][IR]   [OR]
+#inner pair (IL, IR) = steering, outer pair (OL, OR) = spotting junctions
+#each sensor reads 1 = white (or red), 0 = black
+
 import led
 from machine import Pin
 import time
@@ -8,7 +12,7 @@ import movement
 outer_left = Pin(11, Pin.IN)
 inner_left = Pin(12, Pin.IN)
 inner_right = Pin(13, Pin.IN)
-outer_right = Pin(14, Pin.IN)
+outer_right = Pin(14, Pin.IN)   # NOTE: the LED in led.py must NOT also be on GP14
 
 #what to do at each junction, in order
 ROUTE = [
@@ -29,16 +33,20 @@ ROUTE = [
 ]
 
 #tuning numbers
-JUNCTION_CONFIRM = 3          # junction must be seen this many readings in a row
+JUNCTION_CONFIRM = 2          # junction must be seen this many readings in a row
 JUNCTION_COOLDOWN_MS = 500    # after a junction, ignore junctions for this long
 START_IGNORE_MS = 1500        # at the start, ignore junctions for this long (the start spot is a junction)
 DRIVE_PAST_MS = 800           # before a turn, drive forward this long so the wheels are over the junction
 STRAIGHT_MS = 300             # drive this long to get over a junction we go straight over
 SPIN_MIN_MS = 150             # always spin at least this long before looking for the line
+SPIN_MIN_180_MS = 1500        # u-turns: spin this long BLIND first, so it ends up past 90 degrees before looking for the line
 LINE_END_MS = 300             # line gone this long = the end of the line
 LOST_LIMIT_MS = 1500          # line gone this long = lost, stop
-BAR_SKIP_MS = 200             # at the box: drive this long first to get off the T's bar
-BOX_EXTRA_MS = 600            # at the box: drive this much further onto the red
+CORNERS = [2, 5, 9, 12]       # junctions where the line we're ON ends (corners, and T-junctions we hit head-on)
+                              # 2, 12 = bottom-right corner, 5, 9 = coming back onto the right-hand line
+MISSED_CORNER_MS = 150        # at a corner: line gone this long = we've reached the corner, turn now
+BAR_SKIP_MS = 500             # at the box: drive this long first to get off the T's bar
+BOX_EXTRA_MS = 400            # at the box: drive this much further onto the red
 BOX_TIMEOUT_MS = 3000         # at the box: give up looking for red after this long
 END_MS = 800                  # at the start spot: drive this long then stop
 
@@ -49,13 +57,18 @@ last_junction_time = 0    # when we last handled a junction
 lost_since = None         # when we lost the line (None = we can see it)
 
 
+def log(*parts):
+    #like print, but ALSO saves the message to log.txt on the Pico
+    #so you can read what happened after a run without the laptop plugged in
+    message = " ".join(str(p) for p in parts)
+    print(message)
+    with open("log.txt", "a") as f:     # "a" = add to the end of the file
+        f.write(message + "\n")
+
+
 def read_sensors():
     #returns left to right: outer left, inner left, inner right, outer right
-    OL = outer_left.value()
-    IL = inner_left.value()
-    IR = inner_right.value()
-    OR = outer_right.value()
-    return OL, IL, IR, OR
+    return outer_left.value(), inner_left.value(), inner_right.value(), outer_right.value()
 
 
 def reset_route():
@@ -66,6 +79,8 @@ def reset_route():
     #set the "last junction" time in the future so junctions are ignored for START_IGNORE_MS
     last_junction_time = time.ticks_add(time.ticks_ms(), START_IGNORE_MS - JUNCTION_COOLDOWN_MS)
     lost_since = None
+    open("log.txt", "w").close()        # "w" = start a fresh, empty log for this run
+    log("Starting route")
 
 
 def next_action():
@@ -106,20 +121,20 @@ def spin_to_line(direction, min_ms):
 
 
 def box_u_turn():
-    #collection point: drive up to the red box (all four sensors see red), then turn round
+    #collection point: drive up to the red box, then turn round
     movement.move_forward()
     led.wait_ms(BAR_SKIP_MS)                           # get off the T's bar first (it's white too)
     start = time.ticks_ms()
     while time.ticks_diff(time.ticks_ms(), start) < BOX_TIMEOUT_MS:   # give up after BOX_TIMEOUT_MS
         OL, IL, IR, OR = read_sensors()
-        if OL and IL and IR and OR:                    # all four see red = we're at the box
+        if IL and IR and (OL or OR):                   # both inner + at least one outer see red = we're at the box
             break
         steer(OL, IL, IR, OR)                          # otherwise keep following the line towards it
         led.wait_ms(10)
     movement.move_forward()
     led.wait_ms(BOX_EXTRA_MS)                          # a bit further onto the red
-    print("At the red box - u-turn")
-    spin_to_line("left", SPIN_MIN_MS)
+    log("At the red box - u-turn")
+    spin_to_line("left", SPIN_MIN_180_MS)
 
 
 def handle_junction():
@@ -127,7 +142,7 @@ def handle_junction():
     global step
     action = next_action()
     step += 1
-    print("Junction", step, "->", action)
+    log("Junction", step, "->", action)
 
     if action == "straight":
         movement.move_forward()
@@ -141,7 +156,7 @@ def handle_junction():
     elif action == "end":
         movement.move_forward()
         led.wait_ms(END_MS)
-        print("Back at the start - route complete!")
+        log("Back at the start - route complete!")
         return False
     return True
 
@@ -169,7 +184,7 @@ def follow_line():
         junction_hits += 1
         if junction_hits >= JUNCTION_CONFIRM:
             junction_hits = 0
-            print("Junction seen - sensors were", OL, IL, IR, OR)   # DEBUG
+            log("Junction seen - sensors were", OL, IL, IR, OR)   # DEBUG
             keep_going = handle_junction()
             last_junction_time = time.ticks_ms()
             lost_since = None
@@ -189,11 +204,19 @@ def follow_line():
 
     if next_action() == "end_u_turn" and gone_for > LINE_END_MS:
         step += 1
-        print("Step", step, "-> end of line, u-turn")
-        spin_to_line("left", SPIN_MIN_MS)
+        log("Step", step, "-> end of line, u-turn")
+        spin_to_line("left", SPIN_MIN_180_MS)
+        last_junction_time = time.ticks_ms()
+        lost_since = None
+    elif (step + 1) in CORNERS and gone_for > MISSED_CORNER_MS and time.ticks_diff(now, last_junction_time) > JUNCTION_COOLDOWN_MS:
+        #backup for corners: the next junction is a corner and the line has ended, so turn now
+        action = next_action()
+        step += 1
+        log("Junction", step, "->", action, "(line ended at corner)")
+        spin_to_line(action, SPIN_MIN_MS)
         last_junction_time = time.ticks_ms()
         lost_since = None
     elif gone_for > LOST_LIMIT_MS:
-        print("Lost the line - stopping")
+        log("Lost the line - stopping")
         return False
     return True
