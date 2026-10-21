@@ -1,13 +1,12 @@
 
 import time
 import movement
-import linesensor
 import led
 from machine import Pin
-
-
-#set a power pin for sensors and led
-power = Pin(28, Pin.OUT)
+import linefollowing
+import states
+import mapping
+import navigation
 
 #BUTTON CODE
 #set button pin to be an input, the pin pull up mean the button is high normally, and when pressed it will be 
@@ -22,33 +21,9 @@ previous_state = 1
 #the button value is 1 when not pressed, and 0 when pressed
 #set loop that runs always using while True:
 
-######NORMAL CODE
-#while True:
-    #set that current_state is equal to the button value
-#    current_state = button.value()
-    
-    # detect a new press: released (1) to pressed (0)
-#    if previous_state == 1 and current_state == 0:
-#        # change running to the opposite of what it was before
-#        running = not running
+#set starting state of robot 
+state = "collecting"
 
-        #set conditions for what happens if not running, versus running
-#        if not running:
-#            led.led_off()
-#            movement.stop()
-#        else:
-#            led.flash_led(1, 0.1) 
-
-    #update previous_state to be equal to current_state for the next loop
-#    previous_state = current_state
-
-    #set condition for if running
-#    if running:
-#        led.flash_led(1, 0.1)  # flash LED many times with a 0.1 second interval
-#        linesensor.follow_line()
-
-
-#######FOR THE LINE TEST
 while True:
     #set that current_state is equal to the button value
     current_state = button.value()
@@ -56,31 +31,79 @@ while True:
     # detect a new press: released (1) to pressed (0)
     if previous_state == 1 and current_state == 0:
         # change running to the opposite of what it was before
-        running = not running
-
         #set conditions for what happens if not running, versus running
-        if running:
-            linesensor.reset_route()  #start from the first instruction
-            print("Starting route")
-        else:
+        #toggle if on or off based on if button was clicked
+        running = not running 
+        
+        if not running:
+            #if running and button pressed, then not running
             movement.stop()
             led.led_off()
-            print("Stopped by button")
 
-        time.sleep(0.2)  #debounce delay
+        else:
+            #if robot is on, then set robot to be at start node facing north
+            #should be in idle state at start
+            navigation.current_node = 0
+            navigation.heading = "N"
+            navigation.stage = "idle"
+
+        #clear what the target destinations are
+            navigation.target = None
+            navigation.next_node = None
+            navigation.wanted = None
+
+        # clear any interrupted turn, ie. reset everything to start
+            linefollowing.turning = None
+            linefollowing.turn_stage = None
+            linefollowing.turn_started = 0
+
+        # restart the mission.
+            state = "collecting"
 
     #update previous_state to be equal to current_state for the next loop
     previous_state = current_state
 
     #set condition for if running
     if running:
-        led.update_flash()  #flash LED without blocking the rest of the code
-        keep_going = linesensor.follow_line()  #one step of the line following code, returns True if we should keep going, False if we have finished the route
-        
-        if not keep_going:
-            running = False
+        led.update_flash()  #update the led flash while running
+
+        #update journery requested, depending on the state we are in 
+        navigation.update()
+
+        #make it stop if theres an error
+        if navigation.stage== "error":
             movement.stop()
             led.led_off()
-        
-    time.sleep(0.01) #short pause so the loop runs about 100 times per second, which is a good speed for the line following code to run at
+            running=False
 
+        else:
+
+    # this sets the order of states that needs to be followed, provided it has completed prior state
+            if state == "collecting":
+                if states.collecting():
+                    state = "checking_spaces"
+
+            elif state == "checking_spaces":
+                if states.checking_spaces():
+                    state = "delivering"
+
+            elif state == "delivering":
+                if states.delivering():
+                # initially return home after one delivery
+                # later choose whether to collect another parcel
+                    state = "return_start"
+
+            elif state == "return_start":
+                if states.return_start():
+                    movement.stop()
+                    led.led_off()
+                    state = "finished"
+                    running = False
+
+            else:
+                movement.stop()
+                running = False
+                led.led_off()
+
+    # small pause between updates
+    time.sleep_ms(10)

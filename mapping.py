@@ -7,12 +7,8 @@ from collections import deque
 #use nodes, where attaching available directions are clarified
 #we have mapped so north is facing traffic lights at start
 
-# robot's actual position and starting orientation.
-current_node = 0
-heading = "N"
-
 #make map for nodes- see google drive for drawing of map
-map = {
+mapping = {
     # start and start-box boundaries
     0:  {"N": 18, "E": 1, "W": 37},
     1:  {"W": 0, "E": 55},
@@ -103,7 +99,7 @@ map = {
 #stops once it hits the target node
 
 
-def find_path(map, curr_node, target):
+def find_path(mapping, curr_node, target):
     # graph is your map dictionary
     # curr_node is the starting node
     # target is the node we want to reach
@@ -140,7 +136,7 @@ def find_path(map, curr_node, target):
         # look at every node connected to this node
         # .values() gives the node numbers, without the directions
         # for neightbour, means that for every node value attached to current node, is being considered
-        for neighbour in map[node].values():
+        for neighbour in mapping[node].values():
 
             # skip missing connections or nodes already discovered
             #prevents the search repeatedly going around loops
@@ -184,11 +180,11 @@ def find_path(map, curr_node, target):
 
 #we now need to translate our path into the directions and instructions to follow
 #start by defining function that finds direction between two nodes
-def direction_between(current, next_node):
+def direction_between(curr_node, next_node):
     # look through the connections at the current node
     #first variable is the direction, and its attachement in the dictionary is the node
     #if we test each direction and see if its attachment is our target then that is our direction
-    for direction, neighbour in map[current].items():
+    for direction, neighbour in mapping[curr_node].items():
 
         # return the compass direction leading to the next node
         if neighbour == next_node:
@@ -196,43 +192,68 @@ def direction_between(current, next_node):
 
     return None
 
-#now make instructions
-#heading is direction robot is currently in
-def make_instructions(path, heading):
-    # Compass directions arranged clockwise.
-    compass = ["N", "E", "S", "W"]
 
-    # Corresponding actions for 0, 1, 2 or 3 clockwise quarter-turns.
+#find what turn it corresponds to ie. N -> W is left 90 degrees
+#heading is the way it currently is facing, wanted is the direction we want it to head
+def get_turn(heading, wanted):
+    directions= ["N", "E", "S", "W"]
+
+    #we find the difference in direction between the heading and wanted 
+    #we do this by seeing what our heading and wanted position  in our directions list is and feeding back its spot
+    #by divding by 4, we get a corresponding number for what we want to do 
+    #the % gives the remainder after the division
+    # ie. N-> W is (0-3) / 4 means remainder 3
+    difference_between= (directions.index(wanted) - directions.index(heading)) % 4
+
+    #this means that 0 = go straight
+    # 1 = go right
+    # 2 = 180 u turn
+    # 3 = left
+    
     actions = ["straight", "right", "u_turn", "left"]
-
-    # Store the instructions here.
-    instructions = []
-
-    # Look at each consecutive pair of nodes in the path.
-    for i in range(len(path) - 1):
-        current = path[i]
-        next_node = path[i + 1]
-
-        # Find which compass direction leads to the next node.
-        wanted = direction_between(current, next_node)
-
-        if wanted is None:
-            raise ValueError("Path contains unconnected nodes")
-
-        # Compare the wanted direction with the robot's heading.
-        difference = (
-            compass.index(wanted) - compass.index(heading)
-        ) % 4
-
-        # Save the action and the node it leads to.
-        instructions.append((actions[difference], next_node))
-
-        # For planning the next instruction, assume this turn succeeds.
-        heading = wanted
-
-    return instructions
+    #returns what action needs to be executed
+    return actions[difference_between]
 
 
+# calculation of move that needs to be done
+def plan_move(curr_node, target, heading):
+    # calculate the route
+    path = find_path(mapping, curr_node, target)
+
+    # no next move if no route exists or we are already there, we know we there is route is only 1 item
+    if path is None or len(path) < 2:
+        return None
+
+    # find the next node and its compass direction
+    next_node = path[1]
+    #find the direction we want
+    wanted = direction_between(curr_node, next_node)
+
+    # calculate the physical turn
+    action = get_turn(heading, wanted)
+
+    #return our action, next node so we can update it, wanted so we can update direction
+    return action, next_node, wanted
 
 
+#assign important nodes to correct categroies
+collection_nodes = {"A": [38, 39],  "B": [16, 17]}
 
+storage_nodes = {
+    "A_top": [25, 26, 27, 28, 29, 30],
+    "A_bottom": [46, 47, 48, 49, 50, 51],
+    "B_top": [31, 32, 33, 34, 35, 36],
+    "B_bottom": [10, 11, 12, 13, 14, 15]}
+
+home_node = 0
+
+#endpoint mapping
+#when it reaaches an end point it at the drop off points it reads 0000
+#create map of all these end points 
+# Storage endpoints expected to read 0000.
+line_end_nodes = {
+    10, 11, 12, 13, 14, 15,       # Bottom B
+    25, 26, 27, 28, 29, 30,       # Top A
+    31, 32, 33, 34, 35, 36,       # Top B
+    46, 47, 48, 49, 50, 51        # Bottom A
+}

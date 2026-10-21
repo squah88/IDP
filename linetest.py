@@ -2,7 +2,7 @@
 
 import time
 import movement
-import linesensor
+import linefollowing
 import led
 from machine import Pin
 
@@ -61,7 +61,7 @@ while True:
 
         #set conditions for what happens if not running, versus running
         if running:
-            linesensor.reset_route()  #start from the first instruction
+            linefollowing.reset_route()  #start from the first instruction
             print("Starting route")
         else:
             movement.stop()
@@ -76,7 +76,7 @@ while True:
     #set condition for if running
     if running:
         led.update_flash()  #flash LED without blocking the rest of the code
-        keep_going = linesensor.follow_line()  #one step of the line following code, returns True if we should keep going, False if we have finished the route
+        keep_going = linefollowing.follow_line()  #one step of the line following code, returns True if we should keep going, False if we have finished the route
         
         if not keep_going:
             running = False
