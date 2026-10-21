@@ -1,4 +1,3 @@
-
 import time
 import movement
 import led
@@ -7,6 +6,10 @@ import linefollowing
 import states
 import mapping
 import navigation
+
+#SAFE START: if the program was stopped while driving, make sure everything is off
+movement.stop()
+led.led_off()
 
 #BUTTON CODE
 #set button pin to be an input, the pin pull up mean the button is high normally, and when pressed it will be 
@@ -44,7 +47,7 @@ while True:
             #if robot is on, then set robot to be at start node facing north
             #should be in idle state at start
             navigation.current_node = 0
-            navigation.heading = "N"
+            navigation.heading = "E" #FOR THE GRAB TEST CHANGE IT TO E BUT FOR NORMAL CHANGE IT TO N
             navigation.stage = "idle"
 
         #clear what the target destinations are
@@ -56,9 +59,16 @@ while True:
             linefollowing.turning = None
             linefollowing.turn_stage = None
             linefollowing.turn_started = 0
+            linefollowing.lost_since = None
+
+        # clear what the states remember from any earlier run
+            states.step = None
+            states.used_slots = []
 
         # restart the mission.
             state = "collecting"
+
+        time.sleep(0.2)  #debounce - ignore the button bouncing for a moment after a press
 
     #update previous_state to be equal to current_state for the next loop
     previous_state = current_state

@@ -38,27 +38,24 @@ def read_sensors():
 #create global variable turning, this is used to determine if our code should 
 #continue turning, or if line has been found and can stop turning
 
+#how long the line must be gone before we decide it really ended (at a rack) or we're really lost
+#a quick wobble off the line shouldn't end the whole run
+LINE_END_MS = 300
+LOST_LIMIT_MS = 1500
+
+#when we first lost the line (None = we can see it)
+lost_since = None
 
 def following_line(next_node):
-    # call global variables
-    global turning, turn_started
+    #call global variables
+    global lost_since
     OL, IL, IR, OR = read_sensors()
-
-    #if we are at drop off points, it reads 0000 as end of line
-    if OL == 0 and IL == 0 and IR == 0 and OR == 0:
-        movement.stop()
-
-    #test if the next node is an expected 0000 and if so mark it as node found, if not lost
-        if next_node in line_end_nodes:
-            return "node"
-
-        return "lost"
-    
 
     #first find if a node is detected, this is when 1100, 1110, 0011, 0111 or if junction 1111
     #if we are at node let navigation choose move, node is taking by our code in navigation to figure out next step
     if (OL == 1 and IL == 1) or (IR == 1 and OR == 1):
         movement.stop()
+        lost_since = None
         return "node"
 
     # 0110- move forward
@@ -81,12 +78,29 @@ def following_line(next_node):
     elif OL == 0 and IL == 0 and IR == 1 and OR == 0:
         movement.slight_right()
 
-    #all other readings- stop
-    #returns lost if it loses line for all other cominaations 
-    #when we receive lost, it stops movement
+    #all other readings (0000, or odd ones like 1001) - we can't see the line properly
+    #keep doing the last movement for a moment instead of giving up straight away
     else:
-        movement.stop()
-        return "lost"
+        if lost_since is None:
+            lost_since = time.ticks_ms()
+        gone_for = time.ticks_diff(time.ticks_ms(), lost_since)
+
+        #at drop off points the line ends (0000) - if we expect a line end and it's been gone long enough, we've arrived
+        if next_node in line_end_nodes and OL == 0 and IL == 0 and IR == 0 and OR == 0 and gone_for > LINE_END_MS:
+            movement.stop()
+            lost_since = None
+            return "node"
+
+        #gone for too long - really lost
+        if gone_for > LOST_LIMIT_MS:
+            movement.stop()
+            lost_since = None
+            return "lost"
+
+        return "following"
+
+    #we can see the line, so we're not lost
+    lost_since = None
 
 # tell the main loop that it can keep calling this function
     return "following"
@@ -103,6 +117,9 @@ IGNORE_LINE_MS = 600
 
 # how long we idgnore line for 180 turn
 IGNORE_180_MS = 1200
+
+# if a turn takes longer than this, give up (stops it spinning forever)
+TURN_TIMEOUT_MS = 6000
 
 # remembers whether the robot is currently turning
 # None = not turning; "left" or "right" = turning that way
@@ -198,6 +215,13 @@ def update_turn():
     if elapsed < ignore_ms:
         return False
 
+    # spinning for too long - give up and tell navigation the turn failed
+    if elapsed > TURN_TIMEOUT_MS:
+        movement.stop()
+        turning = None
+        turn_stage = None
+        return "failed"
+
     OL, IL, IR, OR = read_sensors()
 
     # finish when aligned with the outgoing line
@@ -209,4 +233,3 @@ def update_turn():
 
     # still turning, repeat function
     return False
-#this update code returns false whilst still turnign and true when turn completed

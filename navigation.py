@@ -1,7 +1,10 @@
 import mapping
 import linefollowing
 import movement
-import mapping
+
+#where the robot is and which way it faces (main.py sets these when the button is pressed)
+current_node = 0
+heading = "N"
 
 #set what our target is and what the next node to get to target is and the wanted fdirection we want to point
 #to be looking at next node
@@ -26,6 +29,7 @@ def go_to(destination):
     target = destination
     #plan first connection node
     plan_connection()
+    return True
 
 
 #plan next action
@@ -75,7 +79,14 @@ def update():
         # continue the requested turn until aligned
         #our update turn returns false if still turning
         #once fully turned, it returns true
-        if linefollowing.update_turn():
+        result = linefollowing.update_turn()
+
+        #turn gave up (spun too long) - stop
+        if result == "failed":
+            movement.stop()
+            stage = "error"
+
+        elif result:
             #when true, we change the new direction our robot is in to what we wanted it to be ie. direction it shpuld now be facing
             #then change stage to clearing
             heading = wanted

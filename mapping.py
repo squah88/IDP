@@ -1,9 +1,6 @@
 #creating map for each junction
 
-#import queue functions, so route can be added as a queue
-from collections import deque
-
-#use BFS route planner to find the shortest route to node
+#use breadth first search route planner to find the shortest route to node
 #use nodes, where attaching available directions are clarified
 #we have mapped so north is facing traffic lights at start
 
@@ -90,92 +87,90 @@ mapping = {
     51: {"W": 40}
 }
 
-
 #create bfs code
 #start by creating a function that finds the correct path
 #it does this by taking starting node, target and the dictionary of nodes
 #from the starting nodes it considers the nodes attached to this
-#it then considers the nodes attached to those nodes and continues to do so
+#it then considers the nodes attached to those nodes and so on and so forth
 #stops once it hits the target node
 
-
 def find_path(mapping, curr_node, target):
-    # graph is your map dictionary
-    # curr_node is the starting node
-    # target is the node we want to reach
+    #mapping is your map dictionary
+    #curr_node is the starting node
+    #target is the node we want to reach
 
-    # if we are already at the target, no travelling is needed, so return current node
+    #if we are already at the target, no travelling is needed, so return current node
     if curr_node == target:
         return [curr_node]
 
-    # remember how we discovered each node
-    # eg. parents[1] = 0 means we found node 1 from node 0 ie. 0 : 1
-    # starting node has no parent
+    #remember how we discovered each node
+    #eg. parents[1] = 0 means we found node 1 from node 0 ie. 0 : 1
+    #starting node has no parent
     parents = {curr_node: None}
 
-    # create waiting list of nodes whose connections need checking
-    # initially, only the starting node is waiting
-    # ie. if queue is 0 1 2
-    # 0 conencts to 1 and 2
-    # 1 connects to 3 4
-    # 2 connected to 5 6
-    # thus queue is as follows
-    # after 0 -> 1 2
-    # after 1 -> 3 4 5
+    #create waiting list of nodes whose connections need checking
+    #initially, only the starting node is waiting
+    #ie. if queue is 0 1 2
+    #0 connects to 1 and 2
+    #1 connects to 3 4
+    #2 connected to 5 6
+    #thus queue is as follows
+    #after 0 -> 1 2
+    #after 1 -> 3 4 5
     #after 2 -> 3 4 5 6
-    # these will be added to queue
-    #note that 2 appears twice, so we must ensure 2 it is not counted again when considering node 3, despite being attached to 3
-    queue = deque([curr_node])
+    #these will be added to queue
+    #note that 2 appears twice, so we must ensure 2 is not counted again when considering node 3, despite being attached to 3
+    queue = [curr_node]
 
-    # keep searching while there are nodes waiting in the queue.
+    #keep searching while there are nodes waiting in the queue.
     while queue:
+        #remove the first waiting node and place it in node to check it next
+        #pop(0) takes the FIRST item out of the list
+        node = queue.pop(0)
 
-        # remove the first waiting node and place it in node to check it next
-        node = queue.popleft()
-
-        # look at every node connected to this node
-        # .values() gives the node numbers, without the directions
-        # for neightbour, means that for every node value attached to current node, is being considered
+        #look at every node connected to this node
+        #.values() gives the node numbers, without the directions
+        #for neightbour, means that for every node value attached to current node, is being considered
         for neighbour in mapping[node].values():
 
-            # skip missing connections or nodes already discovered
+            #skip missing connections or nodes already discovered
             #prevents the search repeatedly going around loops
             if neighbour is None or neighbour in parents:
                 #continue means it skips it and just moves onto next attaching node
                 continue
 
-            # remember which node led us to this neighbour
+            #remember which node led us to this neighbour
             #place this back into the parents list to keep track of route
             parents[neighbour] = node
             #essentialy parents[1] = 0, means that 0 will be added to node 1 route
 
-            # if this neighbour is our target, rebuild the route
+            #if this neighbour is our target, rebuild the route
             if neighbour == target:
 
-                # start the route list with the target
-                # ie. the neighbour ie. the current node we have discovered ie. the target
+                #start the route list with the target
+                #ie. the neighbour ie. the current node we have discovered ie. the target
                 path = [neighbour]
 
-                # path[-1] means the last node in the path list
-                # keep adding its parent until we reach the start
-                # it back tracks the route essentially
-                # starting with target, we check its parent in the dictionary
-                # we then set that parent as the new current mode and find its parent and so on
+                #path[-1] means the last node in the path list
+                #keep adding its parent until we reach the start
+                #it back tracks the route essentially
+                #starting with target, we check its parent in the dictionary
+                #we then set that parent as the new current mode and find its parent and so on
                 #we add this to our path list
                 while parents[path[-1]] is not None:
                     path.append(parents[path[-1]])
 
-                # list currently runs from target back to start
-                # reverse it so it runs from start to target
+                #list currently runs from target back to start
+                #reverse it so it runs from start to target
                 return path[::-1]
 
-            # if this is not the target, add it to the queue
-            # so we can check its connections later
-            # ensures we reset back to checking next value in list
+            #if this is not the target, add it to the queue
+            #so we can check its connections later
+            #ensures we reset back to checking next value in list
             queue.append(neighbour)
 
-    # if the queue becomes empty without finding the target,
-    # there is no route to it.
+    #if the queue becomes empty without finding the target,
+    #there is no route to it.
     return None
 
 #we now need to translate our path into the directions and instructions to follow
