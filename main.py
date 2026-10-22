@@ -117,3 +117,10 @@ while True:
 
     # small pause between updates
     time.sleep_ms(10)
+
+
+    #TODO LIST:
+    # Read magnet and make it go top or bototm rack
+    # distance sensor 
+    #keep track of filled delivery bays
+    
