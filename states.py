@@ -25,6 +25,9 @@ level = "bottom"          # "top" or "bottom" - TODO: read the magnet. bottom fo
 target_slot = None        # the rack slot we chose
 used_slots = []           # slots we've already filled
 
+#create list of collection bays to track which ones are visited
+collection_bays= [17, 16, 38, 39]
+checked_bays = set() #list of collection bays already checekd
 
 def arrived(node):
     #True once navigation has finished and we're at this node
@@ -44,7 +47,15 @@ def collecting():
 
     #1. first call: choose a bay and start driving there
     if step is None:
-        bay = 17                  # mechanism test: always the lower right bay. TODO: choose bays in turn later
+        bay = None
+        
+        #check if node has been collected from already 
+        for node in collection_bays:
+            if node not in checked_bays:
+                bay = node
+                break
+        
+        #go to bay
         navigation.go_to(bay)
         step = "moving"
         return False
@@ -124,3 +135,6 @@ def return_start():
     movement.stop()
     step = None
     return True
+
+
+
