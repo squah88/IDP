@@ -230,9 +230,9 @@ def plan_move(curr_node, target, heading):
     #return our action, next node so we can update it, wanted so we can update direction
     return action, next_node, wanted
 
-
 #assign important nodes to correct categroies
 collection_nodes = {"A": [38, 39],  "B": [16, 17]}
+
 
 storage_nodes = {
     "A_top": [25, 26, 27, 28, 29, 30],
@@ -250,5 +250,4 @@ line_end_nodes = {
     10, 11, 12, 13, 14, 15,       # Bottom B
     25, 26, 27, 28, 29, 30,       # Top A
     31, 32, 33, 34, 35, 36,       # Top B
-    46, 47, 48, 49, 50, 51        # Bottom A
-}
+    46, 47, 48, 49, 50, 51}        # Bottom A
