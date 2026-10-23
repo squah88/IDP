@@ -15,7 +15,6 @@ CLOSED_ANGLE = 90         # arm servo: right arm gripping the package
 #---------- speed ----------
 STEP_MS = 15              # servos move 1 degree every STEP_MS - bigger = slower and gentler
 
-
 class Servo:
     def __init__(self, pin, start_angle):
         self.pwm = PWM(Pin(pin))
