@@ -14,15 +14,9 @@ class Motor:
         self.pwm.duty_u16(0)
         
     def Forward(self, speed=100):
-        self.mDir.value(0)                     # forward = 0 reverse = 1 motor
+        self.mDir.value(1)                     # forward = 1 reverse = 0 motor
         self.pwm.duty_u16(int(65535 * speed / 100))  # speed range 0-100 motor
 
     def Reverse(self, speed=100):
-        self.mDir.value(1)
+        self.mDir.value(0)
         self.pwm.duty_u16(int(65535 * speed / 100))
-
-
-#TO TURN OFF MOTORS
-#motor3.off()
-#motor4.off()
-

@@ -34,10 +34,7 @@ def stop():
     motor3.off()
     motor4.off()
 
-#turn_90_left()
-#turn_90_right()
-#motor3.off()
-#motor4.off()
+#stop()
 #motor3.Forward()
 #motor4.Forward()
 #motor3.Reverse()
