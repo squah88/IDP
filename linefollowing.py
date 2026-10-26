@@ -132,6 +132,9 @@ turn_started = 0
 # trackr if moving forward or spinning
 turn_stage = None
 
+# DEBUG: the last sensor reading we printed (so we only print when it changes)
+last_seen = None
+
 #create function that turn robot
 #this is important as we are implementing a timed turn as well as sensor turn
 #our first funciton will just be for starting our turn, as we need to start by going forward so hweel on axel
@@ -146,6 +149,7 @@ def start_turn(direction):
 
     # remember which way we are turning
     turning = direction
+    print("START TURN:", direction)   # DEBUG
     #start timer from when turn starts
     # record the current time so update_turn() can measure elapsed time
     turn_started = time.ticks_ms()
@@ -168,7 +172,7 @@ def start_turn(direction):
 #continues ignoring until it detects new line ie. 0110
 #this menas it is on new line and can go forward
 def update_turn():
-    global turning, turn_stage, turn_started
+    global turning, turn_stage, turn_started, last_seen
 
     # no turn is in progress, just return
     if turning is None:
@@ -176,6 +180,12 @@ def update_turn():
 
     #calculate the time that has elapseed from us starting timer in start turn and current time
     elapsed = time.ticks_diff(time.ticks_ms(), turn_started)
+
+    # DEBUG: print what the sensors see during the turn (only when the reading changes)
+    seen = read_sensors()
+    if seen != last_seen:
+        print(turn_stage, elapsed, "ms  sensors:", seen)
+        last_seen = seen
 
     # first, move forward for FORWARD_MS
     if turn_stage == "forward":

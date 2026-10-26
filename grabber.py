@@ -37,8 +37,8 @@ class Servo:
             led.wait_ms(STEP_MS)
 
 
-#set up both servos - grabber starts UP and OPEN
-lift = Servo(16, UP_ANGLE)
+#set up both servos - grabber starts DOWN and OPEN
+lift = Servo(16, DOWN_ANGLE)
 arm = Servo(17, OPEN_ANGLE)
 
 
