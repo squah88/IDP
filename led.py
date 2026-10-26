@@ -33,3 +33,4 @@ def wait_ms(ms):
     while time.ticks_diff(time.ticks_ms(), start) < ms:
         update_flash()  #update the led flash while waiting
         time.sleep_ms(10)  #sleep for a short time to avoid busy waiting
+
