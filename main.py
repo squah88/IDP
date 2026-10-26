@@ -13,7 +13,7 @@ led.led_off()
 
 #BUTTON CODE
 #set button pin to be an input, the pin pull up mean the button is high normally, and when pressed it will be 
-button = Pin(15, Pin.IN, Pin.PULL_UP)
+button = Pin(17, Pin.IN, Pin.PULL_UP)   # moved from GP15 (GP15 is now a servo, J35)
 
 #running variable to keep track of if robot is on or off, start with off
 running = False
@@ -37,6 +37,7 @@ while True:
         #set conditions for what happens if not running, versus running
         #toggle if on or off based on if button was clicked
         running = not running 
+        print("BUTTON PRESSED - running =", running)   # DEBUG
         
         if not running:
             #if running and button pressed, then not running
@@ -123,4 +124,3 @@ while True:
     # Read magnet and make it go top or bototm rack
     # distance sensor 
     #keep track of filled delivery bays
-    

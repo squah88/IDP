@@ -1,19 +1,25 @@
 #grabber - picks up and puts down the package, using 2 servos
 #lift servo = turns a gear that moves the whole grabber up / down
 #arm servo  = swings the RIGHT arm closed (gripping against the fixed LEFT arm) or open
-#when this file loads, the grabber goes UP and OPEN - so every run starts the same way
+#when this file loads, the grabber goes DOWN and OPEN - so every run starts the same way
 
 from machine import Pin, PWM
 import led
 
-#---------- angles - find these with test_grabber.py ----------
+#---------- pins - the servos plug into the board's servo connectors ----------
+#J35 is wired to GP15, J36 is wired to GP13
+#if the WRONG servo moves when you test, just swap these two numbers
+LIFT_PIN = 13             # lift servo in J36
+ARM_PIN = 15              # arm servo in J35
+
+#---------- angles - find these with testgrabber.py ----------
 UP_ANGLE = 0              # lift servo: grabber at the top
-DOWN_ANGLE = 90           # lift servo: grabber low enough for the arms to go round the package
-OPEN_ANGLE = 0            # arm servo: right arm swung open
-CLOSED_ANGLE = 90         # arm servo: right arm gripping the package
+DOWN_ANGLE = 135          # lift servo: grabber low enough for the arms to go round the package - TODO: re-check with grabtest.py
+OPEN_ANGLE = 135          # arm servo: right arm swung open
+CLOSED_ANGLE = 100        # arm servo: right arm gripping the package
 
 #---------- speed ----------
-STEP_MS = 15              # servos move 1 degree every STEP_MS - bigger = slower and gentler
+STEP_MS = 60              # servos move 1 degree every STEP_MS - bigger = slower and gentler
 
 class Servo:
     def __init__(self, pin, start_angle):
@@ -38,9 +44,9 @@ class Servo:
 
 
 #set up both servos - grabber starts DOWN and OPEN
-lift = Servo(16, DOWN_ANGLE)
-arm = Servo(17, OPEN_ANGLE)
-
+#lift = Servo(LIFT_PIN, DOWN_ANGLE)
+#arm = Servo(ARM_PIN, OPEN_ANGLE)
+#UNHASH THE PREVIOUS 2 LINES WHEN FINISHED WITH TESTING AND RUNNING MAIN.PY
 
 def grab():
     #pick up the package

@@ -9,10 +9,10 @@ import time
 from mapping import line_end_nodes
 import movement
 
-#sensor pins (GP numbers)
+#sensor pins (GP numbers) - IR moved to GP16 because GP13 is used by the servo connector J36
 OL = Pin(11, Pin.IN)
 IL = Pin(12, Pin.IN)
-IR = Pin(13, Pin.IN)
+IR = Pin(16, Pin.IN)   # moved from GP13 (GP13 is now a servo, J36)
 OR = Pin(14, Pin.IN)
 
 def read_sensors():
@@ -48,8 +48,13 @@ lost_since = None
 
 def following_line(next_node):
     #call global variables
-    global lost_since
+    global lost_since, last_seen
     OL, IL, IR, OR = read_sensors()
+
+    # DEBUG: print what the sensors see while following the line (only when the reading changes)
+    if (OL, IL, IR, OR) != last_seen:
+        print("following to", next_node, " sensors:", (OL, IL, IR, OR))
+        last_seen = (OL, IL, IR, OR)
 
     #first find if a node is detected, this is when 1100, 1110, 0011, 0111 or if junction 1111
     #if we are at node let navigation choose move, node is taking by our code in navigation to figure out next step
@@ -116,10 +121,16 @@ FORWARD_MS = 400
 IGNORE_LINE_MS = 600
 
 # how long we idgnore line for 180 turn
-IGNORE_180_MS = 1200
+IGNORE_180_MS = 1800
 
 # if a turn takes longer than this, give up (stops it spinning forever)
-TURN_TIMEOUT_MS = 6000
+TURN_TIMEOUT_MS = 8000
+
+# spin speed once we start looking for the new line - slower = stops straighter, but too slow and it won't move
+SEARCH_SPEED = 60
+
+# when the turn finds the line, spin backwards this long to stop dead (0 = no brake)
+BRAKE_MS = 40
 
 # remembers whether the robot is currently turning
 # None = not turning; "left" or "right" = turning that way
@@ -207,12 +218,6 @@ def update_turn():
 
         return False
 
-    # keep spinning while checking for completion
-    if turning == "left":
-        movement.spin_left()
-    else:
-        movement.spin_right()
-
     # u turns need a longer initial ignoring period
     #same logic just longer ignore time
     #set how long we should ignore based on action
@@ -220,6 +225,18 @@ def update_turn():
         ignore_ms = IGNORE_180_MS
     else:
         ignore_ms = IGNORE_LINE_MS
+
+    # keep spinning: full speed while ignoring the line, then SLOWER while looking for it
+    # spinning slower means it doesn't overshoot the line when it finds it
+    if elapsed < ignore_ms:
+        speed = 60
+    else:
+        speed = SEARCH_SPEED
+
+    if turning == "left":
+        movement.spin_left(speed)
+    else:
+        movement.spin_right(speed)
 
     # do not accept the old line before ignore time
     if elapsed < ignore_ms:
@@ -236,6 +253,14 @@ def update_turn():
 
     # finish when aligned with the outgoing line
     if OL == 0 and IL == 1 and IR == 1 and OR == 0:
+        # BRAKE: spin the OTHER way for a moment, so it stops rotating right on the line instead of drifting past
+        if turning == "left":
+            movement.spin_right(SEARCH_SPEED)
+        else:
+            movement.spin_left(SEARCH_SPEED)
+        led.wait_ms(BRAKE_MS)
+        movement.stop()
+
         turning = None
         turn_stage = None
         movement.move_forward()
