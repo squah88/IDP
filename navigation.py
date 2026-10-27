@@ -1,7 +1,7 @@
 import mapping
-import time
 import linefollowing
 import movement
+
 
 #set what our target is and what the next node to get to target is and the wanted fdirection we want to point
 #to be looking at next node
@@ -50,7 +50,6 @@ def plan_connection():
 
     #assign what each varibale of move is 
     action, next_node, wanted = move
-    print("AT NODE", current_node, "facing", heading, "-> going to", next_node, ":", action)   # DEBUG
 
     #if action is straibght go forward
     # change stage to clearing, so that when goto called it doesnt accept a new direction, as it is not idle
@@ -98,28 +97,8 @@ def update():
         # move off the current junction before detecting another
         #start by reading the sensors
         OL, IL, IR, OR = linefollowing.read_sensors()
-        if (OL, IL, IR, OR) != linefollowing.last_seen:     # DEBUG - only print when it changes
-            print("clearing, sensors:", OL, IL, IR, OR)
-            linefollowing.last_seen = (OL, IL, IR, OR)
-        #all black for too long = we've driven off the line - stop instead of driving into the wall
-        if OL == 0 and IL == 0 and IR == 0 and OR == 0:
-            if linefollowing.lost_since is None:
-                linefollowing.lost_since = time.ticks_ms()
-            elif time.ticks_diff(time.ticks_ms(), linefollowing.lost_since) > linefollowing.LOST_LIMIT_MS:
-                movement.stop()
-                linefollowing.lost_since = None
-                stage = "error"
-                return
-        else:
-            linefollowing.lost_since = None
-
-        #move forward, but straighten up using the middle two sensors (outer ones are ignored here)
-        if IL == 1 and IR == 0:
-            movement.slight_left()      # line is to the left
-        elif IR == 1 and IL == 0:
-            movement.slight_right()     # line is to the right
-        else:
-            movement.move_forward()
+        #moveforward and then only allow normal line following
+        movement.move_forward()
 
         # only enable arrival detection once back on ordinary line
         if OL == 0 and OR == 0 and (IL == 1 or IR == 1):

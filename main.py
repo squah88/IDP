@@ -13,7 +13,7 @@ led.led_off()
 
 #BUTTON CODE
 #set button pin to be an input, the pin pull up mean the button is high normally, and when pressed it will be 
-button = Pin(17, Pin.IN, Pin.PULL_UP)   # moved from GP15 (GP15 is now a servo, J35)
+button = Pin(0, Pin.IN, Pin.PULL_UP)
 
 #running variable to keep track of if robot is on or off, start with off
 running = False
@@ -37,7 +37,6 @@ while True:
         #set conditions for what happens if not running, versus running
         #toggle if on or off based on if button was clicked
         running = not running 
-        print("BUTTON PRESSED - running =", running)   # DEBUG
         
         if not running:
             #if running and button pressed, then not running
@@ -98,11 +97,28 @@ while True:
                 if states.checking_spaces():
                     state = "delivering"
 
+                #if no availble slots in this rakc
+                else:
+                    movement.stop()
+                    led.led_off()
+                    running= False
+
             elif state == "delivering":
-                if states.delivering():
-                # initially return home after one delivery
-                # later choose whether to collect another parcel
+                #keep track if package was delivered
+                result = states.delivering()
+                
+                if result == "delivered":
                     state = "return_start"
+
+                elif result == "occupied":
+            # find another slot in the same rack
+                    state = "checking_spaces"
+
+                elif result == "error":
+                    movement.stop()
+                    led.led_off()
+                    running = False
+                    print("Delivery stopped")
 
             elif state == "return_start":
                 if states.return_start():
@@ -124,3 +140,11 @@ while True:
     # Read magnet and make it go top or bototm rack
     # distance sensor 
     #keep track of filled delivery bays
+
+    #red led = pin 18 
+    #green led= pin 19
+    #hall effect= pin 21
+    #distance sensor= pin 8
+    #distance sensors clock= pin 9
+
+    
