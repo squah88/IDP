@@ -13,7 +13,7 @@ led.led_off()
 
 #BUTTON CODE
 #set button pin to be an input, the pin pull up mean the button is high normally, and when pressed it will be 
-button = Pin(0, Pin.IN, Pin.PULL_UP)
+button = Pin(17, Pin.IN, Pin.PULL_UP)
 
 #running variable to keep track of if robot is on or off, start with off
 running = False
