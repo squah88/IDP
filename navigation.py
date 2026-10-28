@@ -1,7 +1,12 @@
 import mapping
+import time
 import linefollowing
 import movement
+import debug
 
+#where the robot is and which way it faces (main.py sets these when the button is pressed)
+current_node = 0
+heading = "E"
 
 #set what our target is and what the next node to get to target is and the wanted fdirection we want to point
 #to be looking at next node
@@ -50,6 +55,7 @@ def plan_connection():
 
     #assign what each varibale of move is 
     action, next_node, wanted = move
+    debug.log("AT NODE", current_node, "facing", heading, "-> going to", next_node, ":", action)
 
     #if action is straibght go forward
     # change stage to clearing, so that when goto called it doesnt accept a new direction, as it is not idle
@@ -70,6 +76,14 @@ def update():
 #if stage is already idle or if it is an error, it jsut returns function ie. do nothing
     if stage == "idle" or stage == "error":
         return
+
+    #bay mode (slow, strong steering) ON while we're DRIVING into a collection bay, OFF everywhere else
+    #NOT during the turn itself - the turn's "drive forward first" must be full speed, or the wheels won't reach the junction
+    #(states.py also switches it on while driving into a rack slot)
+    if stage == "turning":
+        movement.bay_mode = False
+    elif stage == "clearing" or stage == "travelling":
+        movement.bay_mode = next_node in mapping.collection_nodes["A"] or next_node in mapping.collection_nodes["B"]
 
 #if we are turning
     if stage == "turning":
@@ -97,8 +111,27 @@ def update():
         # move off the current junction before detecting another
         #start by reading the sensors
         OL, IL, IR, OR = linefollowing.read_sensors()
-        #moveforward and then only allow normal line following
-        movement.move_forward()
+
+        #all black for too long = we've driven off the line - stop instead of driving into the wall
+        if OL == 0 and IL == 0 and IR == 0 and OR == 0:
+            if linefollowing.lost_since is None:
+                linefollowing.lost_since = time.ticks_ms()
+            elif time.ticks_diff(time.ticks_ms(), linefollowing.lost_since) > linefollowing.LOST_LIMIT_MS:
+                movement.stop()
+                linefollowing.lost_since = None
+                stage = "error"
+                return
+        else:
+            linefollowing.lost_since = None
+
+        #move forward, but straighten up using the middle two sensors (outer ones are ignored here)
+        #this fixes a turn that finished slightly crooked
+        if IL == 1 and IR == 0:
+            movement.slight_left()      # line is to the left
+        elif IR == 1 and IL == 0:
+            movement.slight_right()     # line is to the right
+        else:
+            movement.move_forward()
 
         # only enable arrival detection once back on ordinary line
         if OL == 0 and OR == 0 and (IL == 1 or IR == 1):
