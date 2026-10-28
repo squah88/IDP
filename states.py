@@ -15,6 +15,8 @@ import grabber
 import led
 import time
 import linefollowing
+import magnetsensor
+import redorgreen
 
 #tuning numbers
 GRAB_TURN_MS = 150        # before grabbing, turn LEFT this long so the grabber covers more of the bay (0 = don't turn)
@@ -56,9 +58,9 @@ def distance(node):
 
 
 def collecting():
-    global step, bay, rack #,level TODO MAGNET SENSOR
+    global step, bay, rack, level
     
-    #incase or error ie.no rerading TODO Magnet
+    #incase or error ie.no rerading 
     if step == "magnet_error":
         return False
 
@@ -70,8 +72,8 @@ def collecting():
         for node in collection_bays:
             if node not in checked_bays:
                 bay = node
+                #add to list as been checked 
                 checked_bays.append(bay)
-                print(bay)
                 break
         
         #go to bay
@@ -91,23 +93,23 @@ def collecting():
 
     grabber.grab()
     
-     #read magnet once box is collected TODO MAGNET SENSOR
-    #pole= magnetsensor.read_magnet()
+     #read magnet once box is collected 
+    pole= magnetsensor.read_magnet()
 
-    #if pole== "north":
-        #level = "top"
-        #redorgreen.show_north()
+    if pole== "north":
+        level = "top"
+        redorgreen.show_north()
 
-    #elif pole== "south":
-        #level = "bottom"
-        #redorgreen.show_south()
+    elif pole== "south":
+        level = "bottom"
+        redorgreen.show_south()
 
     #for if no pole deteteced
-    #else:
-       # movement.stop()
-       # redorgreen.pole_leds_off()
-       # step= "magnet_error"
-       # return False
+    else:
+        movement.stop()
+        redorgreen.pole_leds_off()
+        step= "magnet_error"
+        return False
 
     movement.spin_right(GRAB_TURN_SPEED)     # turn back the same amount, so we're straight again
     led.wait_ms(GRAB_TURN_MS)
