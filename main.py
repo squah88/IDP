@@ -108,7 +108,12 @@ while True:
                 result = states.delivering()
                 
                 if result == "delivered":
-                    state = "return_start"
+                    #if collection bays is equal to cheecked bays ie. all checked, then return to start, otherwise keep collecting
+                    if states.collection_bays == states.checked_bays:
+                        state = "return_start"
+                    else:
+                        state= "collecting"
+
 
                 elif result == "occupied":
             # find another slot in the same rack
@@ -137,7 +142,7 @@ while True:
 
 
     #TODO LIST:
-    # Read magnet and make it go top or bototm rack
+
     # distance sensor 
     #keep track of filled delivery bays
 
