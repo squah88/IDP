@@ -5,7 +5,7 @@ from machine import Pin, I2C
 from VL53L0X import VL53L0X
 
 #has to be on GP8 (SDA) and GP9 (SCL - clock)
-i2c_bus = I2C(id=0, sda=Pin(8), scl=Pin(9))
+i2c_bus = I2C(id=0, sda=Pin(16), scl=Pin(17))
 
 #set up the sensor
 sensor = VL53L0X(i2c_bus)

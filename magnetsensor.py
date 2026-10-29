@@ -9,7 +9,7 @@ low_threshold = 30000
 high_threshold = 35000 #TODO: test values
 
 #pin
-magnet_sensor = ADC(Pin(26))
+magnet_sensor = ADC(Pin(28))
 
 def read_magnet():
     #take one reading from the hall sensor

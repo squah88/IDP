@@ -9,10 +9,10 @@ from mapping import line_end_nodes
 import movement
 
 #sensor pins
-OL = Pin(11, Pin.IN)
-IL = Pin(12, Pin.IN)
-IR = Pin(16, Pin.IN)
-OR = Pin(14, Pin.IN)
+OL = Pin(18, Pin.IN)
+IL = Pin(19, Pin.IN)
+IR = Pin(20, Pin.IN)
+OR = Pin(21, Pin.IN)
 
 def read_sensors():
     #returns left to right: outer left, inner left, inner right, outer right

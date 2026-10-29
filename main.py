@@ -12,7 +12,7 @@ movement.stop()
 led.led_off()
 
 #set button pin to be an input, the pin pull up mean the button is high normally
-button = Pin(17, Pin.IN, Pin.PULL_UP)
+button = Pin(27, Pin.IN, Pin.PULL_UP)
 
 running = False #keeps track of if robot is on or off, start with off
 previous_state = 1 #keeps track of the button state, start with high because button is not pressed
