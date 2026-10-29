@@ -1,27 +1,34 @@
-from machine import Pin, I2C
-from libs.VL53L0X.VL53L0X import VL53L0X
-from utime import sleep
+#distance sensor VL53L0X time-of-flight measures how far away the thing in front of it is in mm
+#used to check if a rack slot already has a package in it before we drive in
 
-#set up pins
-i2c_bus = I2C(id=0, sda=Pin(8), scl=Pin(9)) # I2C0 on GP8 & GP9
-    # print(i2c_bus.scan())  # Get the address (nb 41=0x29, 82=0x52)
-    
-    
-# Setup vl53l0 object
+from machine import Pin, I2C
+from VL53L0X import VL53L0X
+
+#has to be on GP8 (SDA) and GP9 (SCL - clock)
+i2c_bus = I2C(id=0, sda=Pin(8), scl=Pin(9))
+
+#set up the sensor
 sensor = VL53L0X(i2c_bus)
 sensor.set_Vcsel_pulse_period(sensor.vcsel_period_type[0], 18)
 sensor.set_Vcsel_pulse_period(sensor.vcsel_period_type[1], 14)
 
-#create a distance reading function
+#how many readings to take each time - we use the middle one to avoid bad readings
+readingcount = 3
+
 def read_distance():
-    # start measuring
-    sensor.start()
+    #returns the distance in mm, or None if the sensor didn't answer by adding sensor readings to a list and returning the middle one
+    readings = []
+    for i in range(readingcount):
+        #if the sensor doesn't answer, skip that reading instead of crashing the whole robot
+        try:
+            readings.append(sensor.read())
+        except Exception:
+            pass
 
-    try:
-        # take one reading in millimetres
-        reading = sensor.read()
-    finally:
-        # stop measuring, even if reading fails
-        sensor.stop()
+    #no successful readings returns None
+    if len(readings) == 0:
+        return None
 
-    return reading
+    #sort the readings and return the middle one
+    readings.sort()                     
+    return readings[len(readings) // 2]

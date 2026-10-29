@@ -1,22 +1,21 @@
 #creating map for each junction
 
 #use breadth first search route planner to find the shortest route to node
-#use nodes, where attaching available directions are clarified
 #we have mapped so north is facing traffic lights at start
 
-#make map for nodes- see google drive for drawing of map
+#make map for nodes - see google drive for drawing of map
 mapping = {
-    # start and start-box boundaries
+    #start and start-box boundaries
     0:  {"N": 18, "E": 1, "W": 37},
     1:  {"W": 0, "E": 55},
     18: {"S": 0, "N": 19},
     37: {"E": 0, "W": 54},
 
-    # bottom corners
+    #bottom corners
     54: {"E": 37, "N": 52},
     55: {"W": 1, "N": 2},
 
-    # right-hand main line ie. B
+    #right-hand main line ie. B
     2: {"S": 55, "N": 3, "W": 17},
     3: {"S": 2, "N": 4, "W": 16},
     4: {"S": 3, "N": 5, "W": 15},
@@ -26,7 +25,7 @@ mapping = {
     8: {"S": 7, "N": 9, "W": 11},
     9: {"S": 8, "W": 10},
 
-    # right-hand rack endpoints, drop off points ie. bottom rack B
+    #right-hand rack endpoints, drop off points ie. bottom rack B
     10: {"E": 9},
     11: {"E": 8},
     12: {"E": 7},
@@ -34,11 +33,11 @@ mapping = {
     14: {"E": 5},
     15: {"E": 4},
 
-    # right-hand collection endpoints, pick up boxes ie. B
+    #right-hand collection endpoints, pick up boxes ie. B
     16: {"E": 3},
     17: {"E": 2},
 
-    # centre main line ie. top part
+    #centre main line ie. top part
     19: {"S": 18, "N": 20, "W": 30, "E": 36},
     20: {"S": 19, "N": 21, "W": 29, "E": 35},
     21: {"S": 20, "N": 22, "W": 28, "E": 34},
@@ -46,7 +45,7 @@ mapping = {
     23: {"S": 22, "N": 24, "W": 26, "E": 32},
     24: {"S": 23, "W": 25, "E": 31},
 
-    # centre rack endpoints on the left side ie. top rack A
+    #centre rack endpoints on the left side ie. top rack A
     25: {"E": 24},
     26: {"E": 23},
     27: {"E": 22},
@@ -54,7 +53,7 @@ mapping = {
     29: {"E": 20},
     30: {"E": 19},
 
-    # Centre rack endpoints on the right side ie. top rack B
+    #centre rack endpoints on the right side ie. top rack B
     31: {"W": 24},
     32: {"W": 23},
     33: {"W": 22},
@@ -62,15 +61,15 @@ mapping = {
     35: {"W": 20},
     36: {"W": 19},
 
-    # left-hand collection junctions, pick up boxes ie. A
+    #left-hand collection junctions, pick up boxes ie. A
     52: {"S": 54, "N": 53, "E": 38},
     53: {"S": 52, "N": 40, "E": 39},
 
-    # left-hand collection endpoints ie. A
+    #left-hand collection endpoints ie. A
     38: {"W": 52},
     39: {"W": 53},
 
-    # left-hand main line ie. A
+    #left-hand main line ie. A
     40: {"S": 53, "N": 41, "E": 51},
     41: {"S": 40, "N": 42, "E": 50},
     42: {"S": 41, "N": 43, "E": 49},
@@ -78,7 +77,7 @@ mapping = {
     44: {"S": 43, "N": 45, "E": 47},
     45: {"S": 44, "E": 46},
 
-    # left-hand rack endpoints, drop off ie. bottom rack A
+    #left-hand rack endpoints, drop off ie. bottom rack A
     46: {"W": 45},
     47: {"W": 44},
     48: {"W": 43},
@@ -210,7 +209,7 @@ def get_turn(heading, wanted):
     return actions[difference_between]
 
 
-# calculation of move that needs to be done
+#calculation of move that needs to be done
 def plan_move(curr_node, target, heading):
     # calculate the route
     path = find_path(mapping, curr_node, target)
@@ -242,13 +241,12 @@ storage_nodes = {
 
 home_node = 0
 
-#endpoint mapping
 #when it reaaches an end point it at the drop off points it reads 0000
 #create map of all these end points 
-# Storage endpoints expected to read 0000.
+#storage endpoints expected to read 0000.
 line_end_nodes = {
     10, 11, 12, 13, 14, 15,       # Bottom B
     25, 26, 27, 28, 29, 30,       # Top A
     31, 32, 33, 34, 35, 36,       # Top B
-    46, 47, 48, 49, 50, 51}        # Bottom A
+    46, 47, 48, 49, 50, 51}       # Bottom A
 

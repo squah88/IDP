@@ -1,87 +1,80 @@
 #line sensors + route following
-#4 sensors in a row at the front:  [OL]   [IL][IR]   [OR]
 #inner pair (IL, IR) = steering, outer pair (OL, OR) = spotting junctions
-#each sensor reads 1 = white (or red), 0 = black
+#each sensor reads 1 = white, 0 = black
 
 import led
 from machine import Pin
 import time
 from mapping import line_end_nodes
 import movement
-import debug
 
-#sensor pins (GP numbers) - IR moved to GP16 because GP13 is used by the servo connector J36
-OL = Pin(18, Pin.IN)
-IL = Pin(19, Pin.IN)
-IR = Pin(20, Pin.IN)   # moved from GP13 (GP13 is now a servo, J36)
-OR = Pin(21, Pin.IN)
+#sensor pins
+OL = Pin(11, Pin.IN)
+IL = Pin(12, Pin.IN)
+IR = Pin(16, Pin.IN)
+OR = Pin(14, Pin.IN)
 
 def read_sensors():
     #returns left to right: outer left, inner left, inner right, outer right
     return OL.value(), IL.value(), IR.value(), OR.value()
 
 #line following code
-# 0 0 0 0 = slikely drop off zone point, chekc if it is in list of drop off zones then act
+# 0 0 0 0 = likely drop off zone point, check if it is in list of drop off zones then act
 # 0 1 1 0 = move forward
 # 1 1 0 0 = return our node and execute move
 # 1 1 1 0 = return our node and execute move
 # 0 0 1 1 = return our node and execute move
 # 0 1 1 1 = return our node and execute move
-#note: turning functions continue until middle sensors detect line
-# 1 1 1 1 = junction- decide what to do next
-# 0 1 0 1 = stop- something wrong ADD FIXES
-# 1 0 1 0 = stop - something wrong ADD FIXES
-# 1 0 0 0 = off line- turn left to find line
-# 0 0 0 1 = off line- turn right to find line
+# 1 1 1 1 = junction - decide what to do next
+# 0 1 0 1 = stop - something wrong
+# 1 0 1 0 = stop - something wrong
+# 0 1 0 1 = stop - something wrong
+# 1 0 1 0 = stop - something wrong
+# 1 1 0 1 = stop - something wrong
+# 1 0 1 1 = stop - something wrong
+# 1 0 0 0 = off line - turn left to find line
+# 0 0 0 1 = off line - turn right to find line
 # 0 1 0 0 = turn slightly left
 # 0 0 1 0 = turn slightly right
-# 0 1 0 1 = stop- something wrong ADD FIXES
-#create global variable turning, this is used to determine if our code should 
-#continue turning, or if line has been found and can stop turning
 
 #how long the line must be gone before we decide it really ended (at a rack) or we're really lost
 #a quick wobble off the line shouldn't end the whole run
-LINE_END_MS = 300
-LOST_LIMIT_MS = 1500
+line_end_ms = 300
+lost_limit_ms = 1500
 
 #when we first lost the line (None = we can see it)
 lost_since = None
 
 def following_line(next_node):
     #call global variables
-    global lost_since, last_seen
+    global lost_since
     OL, IL, IR, OR = read_sensors()
     
-    
-    # DEBUG: print what the sensors see while following the line (only when the reading changes)
-    if (OL, IL, IR, OR) != last_seen:
-        debug.log("following to", next_node, " sensors:", (OL, IL, IR, OR))
-        last_seen = (OL, IL, IR, OR)
 
-    #first find if a node is detected, this is when 1100, 1110, 0011, 0111 or if junction 1111
-    #if we are at node let navigation choose move, node is taking by our code in navigation to figure out next step
+    #first find if a node is detected, this is when 1100, 1110, 0011, 0111 or 1111
+    #if we are at a node, stop and return node and let navigation choose next move
     if (OL == 1 and IL == 1) or (IR == 1 and OR == 1):
         movement.stop()
         lost_since = None
         return "node"
 
-    # 0110- move forward
+    #0110 - move forward
     elif OL== 0 and IL == 1 and IR == 1 and OR == 0:
         movement.move_forward()
 
-    # 1000- steer left
+    #1000 - steer left
     elif OL == 1 and IL == 0 and IR == 0 and OR == 0:
         movement.slight_left()
 
-    # 0001- steer right
+    #0001- steer right
     elif OL == 0 and IL == 0 and IR == 0 and OR == 1:
         movement.slight_right()
 
-    # 0100- slight left
+    #0100 - slight left
     elif OL == 0 and IL == 1 and IR == 0 and OR == 0:
         movement.slight_left()
 
-    # 0010- sleight right
+    #0010 - slight right
     elif OL == 0 and IL == 0 and IR == 1 and OR == 0:
         movement.slight_right()
 
@@ -90,16 +83,16 @@ def following_line(next_node):
     else:
         if lost_since is None:
             lost_since = time.ticks_ms()
-        gone_for = time.ticks_diff(time.ticks_ms(), lost_since)
+        gone_for = time.ticks_diff(time.ticks_ms(), lost_since) #calculate how long we've been lost for
 
         #at drop off points the line ends (0000) - if we expect a line end and it's been gone long enough, we've arrived
-        if next_node in line_end_nodes and OL == 0 and IL == 0 and IR == 0 and OR == 0 and gone_for > LINE_END_MS:
+        if next_node in line_end_nodes and OL == 0 and IL == 0 and IR == 0 and OR == 0 and gone_for > line_end_ms:
             movement.stop()
             lost_since = None
             return "node"
 
         #gone for too long - really lost
-        if gone_for > LOST_LIMIT_MS:
+        if gone_for > lost_limit_ms:
             movement.stop()
             lost_since = None
             return "lost"
@@ -109,54 +102,26 @@ def following_line(next_node):
     #we can see the line, so we're not lost
     lost_since = None
 
-# tell the main loop that it can keep calling this function
+    #tell the main loop that it can keep calling this function
     return "following"
 
+#variables for what our robot does if at nodes
+forward_ms = 300 #time to move forward before spinning, in milliseconds
+ignore_line_ms = 300 # amount of time we ignore the sensors at the start of a left/right spin
+ignore_180_ms = 1400 #how long we ignore line for 180 turn
+turn_timeout_ms = 4000  #if a turn takes longer than this, give up
+search_speed = 70 #spin speed once we start looking for the new line
+brake_ms = 40 #when the turn finds the line, spin backwards this long to stop overshooting
+u_turn_direction = "right" #which way U-turns spin - "left" or "right" - doesnt really matter except for troubleshooting
 
-#now code for what our robot does if at nodes
-# time to move forward before spinning, in milliseconds
-# needed, as wheels need to reach turn point
-FORWARD_MS = 300
+#variables to remember whether the robot is currently turning or not
+turning = None #None = not turning; "left" or "right" = turning that way
+turn_started = 0 #stores the time when the spin started
+turn_stage = None #track if moving forward or spinning
+spin_dir = None #which way we are actually spinning: "left" or "right"
 
-# amount of time we ignore the sensors at the start of a left/right spin
-# (short now - the turn also waits until it has LEFT the old line, so it can't stop on it)
-IGNORE_LINE_MS = 300
-
-# how long we idgnore line for 180 turn
-IGNORE_180_MS = 1400
-
-# if a turn takes longer than this, give up (stops it spinning forever)
-TURN_TIMEOUT_MS = 4000
-
-# spin speed once we start looking for the new line - slower = stops straighter, but too slow and it won't move
-SEARCH_SPEED = 70
-
-# when the turn finds the line, spin backwards this long to stop dead (0 = no brake)
-BRAKE_MS = 40
-
-# which way U-turns spin - "left" or "right"
-U_TURN_DIRECTION = "right"
-
-# remembers whether the robot is currently turning
-# None = not turning; "left" or "right" = turning that way
-# this means robot stops turning based on if it sees 0110
-turning = None
-
-# stores the time when the spin started
-turn_started = 0
-
-# trackr if moving forward or spinning
-turn_stage = None
-
-# which way we are actually spinning: "left" or "right" (a u_turn spins U_TURN_DIRECTION)
-spin_dir = None
-
-# becomes True once the middle sensors have come OFF the old line during the spin
-# we only accept a new line after this - so the turn can't finish on the line it started on
+#becomes True once the middle sensors have come off the old line during the spin so the the agv doesnt end up back on the old line
 left_old_line = False
-
-# DEBUG: the last sensor reading we printed (so we only print when it changes)
-last_seen = None
 
 def spin(direction, speed):
     #spin on the spot, "left" or "right"
@@ -165,105 +130,84 @@ def spin(direction, speed):
     else:
         movement.spin_right(speed)
 
-#create function that turn robot
-#this is important as we are implementing a timed turn as well as sensor turn
-#our first funciton will just be for starting our turn, as we need to start by going forward so hweel on axel
-def start_turn(direction):
-    #call our global variables
-    global turning, turn_stage, turn_started, left_old_line, spin_dir
+def start_turn(direction, forward_first=True):
+    #start a turn, either left, right or u_turn
+    #forward_first = True means drive forward for a moment before spinning to get the wheels axle to the corner
+    #forward_first = False means spin immediately without moving forward first
+    global turning, turn_stage, turn_started, left_old_line, spin_dir #global variables to remember what we are doing
 
     #if the direction is not a turn then stop movement
     if direction not in ("left", "right", "u_turn"):
         movement.stop()
         return
 
-    # remember which way we are turning
+    #remember which way we are turning
     turning = direction
-    left_old_line = False     # haven't left the old line yet
+    left_old_line = False     #haven't left the old line yet
 
-    # which way to spin: left/right turns spin that way, u-turns spin U_TURN_DIRECTION
+    #which way to spin
     if direction == "u_turn":
-        spin_dir = U_TURN_DIRECTION
+        spin_dir = u_turn_direction
     else:
         spin_dir = direction
-    debug.log("START TURN:", direction)   # DEBUG
-    #start timer from when turn starts
-    # record the current time so update_turn() can measure elapsed time
+    #record the time when the turn started, so we can ignore the line for a moment if the sensors see it again during the spin
     turn_started = time.ticks_ms()
 
-    if direction == "u_turn":
-        # if u turn, start a U-turn immediately, without moving forward
+    if direction == "u_turn" or not forward_first:
+        #if u turn or told not to drive forward, start spinning
         turn_stage = "spinning"
         spin(spin_dir, 60)
 
-    else:
-        # For left/right turns, move forward first
-        #we do this by just putting the stage of turn to forward
-        #we call the motors to move forward in update turn
-        # so the wheel axle reaches the corner
+    else: 
         turn_stage = "forward"
         movement.move_forward()
 
 #this if for figuring out when turn is complete
-#uses a timer to ignore line for set amount of time
-#continues ignoring until it detects new line ie. 0110
-#this menas it is on new line and can go forward
 def update_turn():
-    global turning, turn_stage, turn_started, last_seen, left_old_line
+    global turning, turn_stage, turn_started, left_old_line
 
-    # no turn is in progress, just return
+    #no turn is in progress, just return
     if turning is None:
         return True
 
     #calculate the time that has elapseed from us starting timer in start turn and current time
     elapsed = time.ticks_diff(time.ticks_ms(), turn_started)
 
-    # DEBUG: print what the sensors see during the turn (only when the reading changes)
-    seen = read_sensors()
-    if seen != last_seen:
-        debug.log(turn_stage, elapsed, "ms  sensors:", seen)
-        last_seen = seen
-
-    # first, move forward for FORWARD_MS
+    #first, move forward for forward_ms
     if turn_stage == "forward":
-        if elapsed < FORWARD_MS:
+        if elapsed < forward_ms:
             movement.move_forward()
             return False
 
-        #once forward completed for set amount of time, change turning stage to spinning, as we begin turn 
-        # start spinning
+        #once forward completed for set amount of time, change turning stage to spinning
         turn_stage = "spinning"
         #restart timer for start of spin
         turn_started = time.ticks_ms()
 
-    # set turning directions, this only begins if just finished moving forward, otherwise goes to next if function, where it immediatley starts spinning without forward
+    #set turning directions, this only begins if just finished moving forward, otherwise goes to next if function, where it immediatley starts spinning without forward
         spin(spin_dir, 60)
-
         return False
 
-    # u turns need a longer initial ignoring period
-    #same logic just longer ignore time
-    #set how long we should ignore based on action
+    #set ignore time based on turn type
     if turning == "u_turn":
-        ignore_ms = IGNORE_180_MS
+        ignore_ms = ignore_180_ms
     else:
-        ignore_ms = IGNORE_LINE_MS
+        ignore_ms = ignore_line_ms
 
-    # keep spinning: full speed while ignoring the line, then SLOWER while looking for it
-    # spinning slower means it doesn't overshoot the line when it finds it
+    #keep spinning full speed while ignoring the line then slower while looking for it to stop overshooting
     if elapsed < ignore_ms:
         speed = 70
     else:
-        speed = SEARCH_SPEED
+        speed = search_speed
 
     spin(spin_dir, speed)
 
-    # do not accept the old line before ignore time
+    #do not accept the old line before ignore time
     if elapsed < ignore_ms:
         return False
 
-    # spinning for too long - give up and tell navigation the turn failed
-    if elapsed > TURN_TIMEOUT_MS:
+    #spinning for too long so give up
+    if elapsed > turn_timeout_ms:
         movement.stop()
         turning = None
         turn_stage = None
@@ -271,22 +215,21 @@ def update_turn():
 
     OL, IL, IR, OR = read_sensors()
 
-    # step 1: wait until both middle sensors are OFF the old line (both see black)
-    # if we started on black already (e.g. at a corner) this happens straight away
+    #step 1: wait until both middle sensors are off the old line
     if not left_old_line:
         if IL == 0 and IR == 0:
             left_old_line = True
         return False
 
-    # step 2: finish when BOTH middle sensors are on the NEW line
-    # (outer sensors ignored - near a junction they can also see white, e.g. 0111 or 1111)
+    #step 2: finish when both middle sensors are on the new line
+    #(outer sensors ignored - near a junction they can also see white, eg 0111 or 1111)
     if IL == 1 and IR == 1:
-        # BRAKE: spin the OTHER way for a moment, so it stops rotating right on the line instead of drifting past
+        #spin the other way for a moment to stop overshooting
         if spin_dir == "left":
-            spin("right", SEARCH_SPEED)
+            spin("right", search_speed)
         else:
-            spin("left", SEARCH_SPEED)
-        led.wait_ms(BRAKE_MS)
+            spin("left", search_speed)
+        led.wait_ms(brake_ms)
         movement.stop()
 
         turning = None
@@ -296,4 +239,3 @@ def update_turn():
 
     # still turning, repeat function
     return False
-

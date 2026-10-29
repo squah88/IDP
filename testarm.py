@@ -1,5 +1,4 @@
 #test the ARM servo (J35 = GP15) - moves slowly from START to TARGET
-#####ON THONNY ITS ON GRABTEST.PY#####
 from machine import Pin, PWM
 import time
 

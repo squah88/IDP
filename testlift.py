@@ -1,5 +1,4 @@
 #move the LIFT J36 - GP13
-#####ON THONNY ITS ON GRABTEST.PY#####
 
 from machine import Pin, PWM
 import time

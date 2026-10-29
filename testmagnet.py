@@ -5,5 +5,5 @@ import time
 
 while True:
     reading = magnetsensor.read_magnet()
-    print("Magnet reading:", reading)
+    print("raw:", magnetsensor.magnet_sensor.read_u16(), " pole:", reading)
     time.sleep(0.5)
