@@ -1,3 +1,6 @@
+"""VL53L0X MicroPython driver. Distance from read() is in millimetres.
+Corrected from the supplied driver; hardware validation is still required.
+"""
 from micropython import const
 import ustruct
 import utime
@@ -114,7 +117,6 @@ class VL53L0X:
         self.init()
         self._started = False
         self.measurement_timing_budget_us = 0
-        self.set_measurement_timing_budget(self.measurement_timing_budget_us)
         self.enables = {"tcc": 0,
                         "dss": 0,
                         "msrc": 0,
@@ -130,6 +132,8 @@ class VL53L0X:
                          "final_range_us": 0
                          }
         self.vcsel_period_type = ["VcselPeriodPreRange", "VcselPeriodFinalRange"]
+        if not self.set_measurement_timing_budget(33000):
+            raise ValueError("Could not set measurement timing budget")
 
     def _registers(self, register, values=None, struct='B'):
         if values is None:
@@ -203,8 +207,8 @@ class VL53L0X:
         spads_enabled = 0
         for i in range(48):
             if i < 12 and is_aperture or spads_enabled >= spad_count:
-                spad_map[i // 8] &= ~(1 << (i >> 2))
-            elif spad_map[i // 8] & (1 << (i >> 2)):
+                spad_map[i // 8] &= ~(1 << (i % 8))
+            elif spad_map[i // 8] & (1 << (i % 8)):
                 spads_enabled += 1
 
         self._registers(_SPAD_ENABLES, spad_map, struct='6B')
@@ -390,7 +394,7 @@ class VL53L0X:
             oscilator = self._register(_OSC_CALIBRATE, struct='>H')
             if oscilator:
                 period *= oscilator
-            self._register(_MEASURE_PERIOD, period, struct='>H')
+            self._register(_MEASURE_PERIOD, period, struct='>I')
             self._register(_SYSRANGE_START, 0x04)
         else:
             self._register(_SYSRANGE_START, 0x02)
@@ -401,7 +405,7 @@ class VL53L0X:
         self._config(
             (0xFF, 0x01),
             (0x00, 0x00),
-            (0x91, self._stop_variable),
+            (0x91, 0x00),
             (0x00, 0x01),
             (0xFF, 0x00),
         )
@@ -438,7 +442,7 @@ class VL53L0X:
     def set_signal_rate_limit(self, limit_Mcps):
         if limit_Mcps < 0 or limit_Mcps > 511.99:
             return False
-        self._register(0x44, limit_Mcps * (1 << 7))
+        self._register(0x44, int(limit_Mcps * (1 << 7)), struct='>H')
         return True
 
     def decode_Vcsel_period(self, reg_val):
@@ -470,7 +474,7 @@ class VL53L0X:
 
             new_pre_range_timeout_mclks = self.timeout_microseconds_to_Mclks(self.timeouts["pre_range_us"],
                                                                              period_pclks)
-            self._register(PRE_RANGE_CONFIG_TIMEOUT_MACROP_HI, self.encode_timeout(new_pre_range_timeout_mclks))
+            self._register(PRE_RANGE_CONFIG_TIMEOUT_MACROP_HI, self.encode_timeout(new_pre_range_timeout_mclks), struct='>H')
 
             new_msrc_timeout_mclks = self.timeout_microseconds_to_Mclks(self.timeouts["msrc_dss_tcc_us"],
                                                                         period_pclks)
@@ -480,7 +484,7 @@ class VL53L0X:
                 self._register(FINAL_RANGE_CONFIG_VALID_PHASE_HIGH, 0x10)
                 self._register(FINAL_RANGE_CONFIG_VALID_PHASE_LOW, 0x08)
                 self._register(GLOBAL_CONFIG_VCSEL_WIDTH, 0x02)
-                self._(ALGO_PHASECAL_CONFIG_TIMEOUT, 0x0C)
+                self._register(ALGO_PHASECAL_CONFIG_TIMEOUT, 0x0C)
                 self._register(0xFF, 0x01)
                 self._register(ALGO_PHASECAL_LIM, 0x30)
                 self._register(0xFF, 0x00)
@@ -516,11 +520,12 @@ class VL53L0X:
             new_final_range_timeout_mclks = self.timeout_microseconds_to_Mclks(self.timeouts["final_range_us"], period_pclks)
 
             if self.enables["pre_range"]:
-                new_final_range_timeout_mclks += 1
-            self._register(FINAL_RANGE_CONFIG_TIMEOUT_MACROP_HI, self.encode_timeout(new_final_range_timeout_mclks))
+                new_final_range_timeout_mclks += self.timeouts["pre_range_mclks"]
+            self._register(FINAL_RANGE_CONFIG_TIMEOUT_MACROP_HI, self.encode_timeout(new_final_range_timeout_mclks), struct='>H')
         else:
             return False
-        self.set_measurement_timing_budget(self.measurement_timing_budget_us)
+        if not self.set_measurement_timing_budget(self.measurement_timing_budget_us):
+            raise ValueError("Could not restore measurement timing budget")
         sequence_config = self._register(SYSTEM_SEQUENCE_CONFIG)
         self._register(SYSTEM_SEQUENCE_CONFIG, 0x02)
         self.perform_single_ref_calibration(0x0)
@@ -539,9 +544,9 @@ class VL53L0X:
 
     def get_vcsel_pulse_period(self, type):
         if type == self.vcsel_period_type[0]:
-            return self.decode_Vcsel_period(0x50)
+            return self.decode_Vcsel_period(self._register(0x50))
         elif type == self.vcsel_period_type[1]:
-            return self.decode_Vcsel_period(0x70)
+            return self.decode_Vcsel_period(self._register(0x70))
         else:
             return 255
 
@@ -551,12 +556,12 @@ class VL53L0X:
         self.timeouts["msrc_dss_tcc_us"] = self.timeout_Mclks_to_microseconds(self.timeouts["msrc_dss_tcc_mclks"],
                                                                               self.timeouts[
                                                                                   "pre_range_vcsel_period_pclks"])
-        self.timeouts["pre_range_mclks"] = self.decode_timeout(PRE_RANGE_CONFIG_TIMEOUT_MACROP_HI)
+        self.timeouts["pre_range_mclks"] = self.decode_timeout(self._register(PRE_RANGE_CONFIG_TIMEOUT_MACROP_HI, struct='>H'))
         self.timeouts["pre_range_us"] = self.timeout_Mclks_to_microseconds(self.timeouts["pre_range_mclks"],
                                                                            self.timeouts[
                                                                                "pre_range_vcsel_period_pclks"])
         self.timeouts["final_range_vcsel_period_pclks"] = self.get_vcsel_pulse_period(self.vcsel_period_type[1])
-        self.timeouts["final_range_mclks"] = self.decode_timeout(self._register(FINAL_RANGE_CONFIG_TIMEOUT_MACROP_HI))
+        self.timeouts["final_range_mclks"] = self.decode_timeout(self._register(FINAL_RANGE_CONFIG_TIMEOUT_MACROP_HI, struct='>H'))
 
         if self.enables["pre_range"]:
             self.timeouts["final_range_mclks"] -= self.timeouts["pre_range_mclks"]
@@ -566,14 +571,14 @@ class VL53L0X:
 
     def timeout_Mclks_to_microseconds(self, timeout_period_mclks, vcsel_period_pclks):
         macro_period_ns = self.calc_macro_period(vcsel_period_pclks)
-        return ((timeout_period_mclks * macro_period_ns) + (macro_period_ns / 2)) / 1000
+        return ((timeout_period_mclks * macro_period_ns) + 500) // 1000
 
     def timeout_microseconds_to_Mclks(self, timeout_period_us, vcsel_period_pclks):
         macro_period_ns = self.calc_macro_period(vcsel_period_pclks)
-        return (((timeout_period_us * 1000) + (macro_period_ns / 2)) / macro_period_ns)
+        return int(((timeout_period_us * 1000) + (macro_period_ns // 2)) // macro_period_ns)
 
     def calc_macro_period(self, vcsel_period_pclks):
-        return (((2304 * (vcsel_period_pclks) * 1655) + 500) / 1000)
+        return ((2304 * vcsel_period_pclks * 1655) + 500) // 1000
 
     def decode_timeout(self, reg_val):
         return ((reg_val & 0x00FF) << ((reg_val & 0xFF00) >> 8)) + 1
@@ -589,7 +594,7 @@ class VL53L0X:
             while (ls_byte & 0xFFFFFF00) > 0:
                 ls_byte >>= 1
                 ms_byte += 1
-            return (ms_byte << 8) or (ls_byte & 0xFF)
+            return (ms_byte << 8) | (ls_byte & 0xFF)
         else:
             return 0
 
@@ -629,17 +634,18 @@ class VL53L0X:
 
             if self.enables["pre_range"]:
                 final_range_timeout_mclks += self.timeouts["pre_range_mclks"]
-            self._register(FINAL_RANGE_CONFIG_TIMEOUT_MACROP_HI, self.encode_timeout(final_range_timeout_mclks))
+            self._register(FINAL_RANGE_CONFIG_TIMEOUT_MACROP_HI, self.encode_timeout(final_range_timeout_mclks), struct='>H')
             self.measurement_timing_budget_us = budget_us
         return True
 
     def perform_single_ref_calibration(self, vhv_init_byte):
         self._register(SYSRANGE_START, 0x01|vhv_init_byte)
         chrono_start = utime.ticks_ms()
-        while self._register((RESULT_INTERRUPT_STATUS & 0x07) == 0):
-            time_elapsed = utime.ticks_ms() - chrono_start
+        while (self._register(RESULT_INTERRUPT_STATUS) & 0x07) == 0:
+            time_elapsed = utime.ticks_diff(utime.ticks_ms(), chrono_start)
             if time_elapsed > _IO_TIMEOUT:
-                return False
+                raise TimeoutError("Reference calibration timed out")
+            utime.sleep_ms(1)
         self._register(SYSTEM_INTERRUPT_CLEAR, 0x01)
         self._register(SYSRANGE_START, 0x00)
         return True
