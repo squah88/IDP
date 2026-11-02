@@ -108,7 +108,7 @@ def update():
             if linefollowing.lost_since is None:
                 linefollowing.lost_since = time.ticks_ms()
             #if we've been off the line for too long, stop and error
-            elif time.ticks_diff(time.ticks_ms(), linefollowing.lost_since) > linefollowing.LOST_LIMIT_MS:
+            elif time.ticks_diff(time.ticks_ms(), linefollowing.lost_since) > linefollowing.lost_limit_ms:
                 movement.stop()
                 linefollowing.lost_since = None
                 stage = "error"
