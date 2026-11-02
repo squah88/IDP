@@ -57,7 +57,7 @@ while True:
 
         #clear what the states remember from any earlier run
             states.step = None
-            states.checked_bays = []
+            states.next_bay = 0
             states.occupied_slots = []
 
         #restart
@@ -84,8 +84,15 @@ while True:
         else:
          #this sets the order of states that needs to be followed, provided it has completed prior state
             if state == "collecting":
-                if states.collecting():
+                result = states.collecting()
+
+                #got a package - find a slot for it
+                if result is True:
                     state = "checking_spaces"
+
+                #bay was empty - stay in "collecting", so it goes to the next bay
+                elif result == "empty":
+                    state = "collecting"
 
             elif state == "checking_spaces":
                 if states.checking_spaces():
@@ -102,11 +109,8 @@ while True:
                 result = states.delivering()
                 
                 if result == "delivered":
-                    #if every collection bay has been checked, return to start, otherwise keep collecting
-                    if len(states.checked_bays) == len(states.collection_bays):
-                        state = "return_start"
-                    else:
-                        state= "collecting"
+                    #bays get refilled, so keep going round them until the stop button is pressed
+                    state = "collecting"
 
 
                 elif result == "occupied":

@@ -112,6 +112,8 @@ ignore_180_ms = 1400 #how long we ignore line for 180 turn
 turn_timeout_ms = 4000  #if a turn takes longer than this, give up
 search_speed = 100 #spin speed once we start looking for the new line
 brake_ms = 40 #when the turn finds the line, spin backwards this long to stop overshooting
+reverse_after_turn_ms = 150 #ONLY when turning onto the main line after leaving a slot/bay: reverse this long afterwards
+                            #so the sensors move back behind the next junction (rack junctions are very close) - 0 = off
 u_turn_direction = "right" #which way U-turns spin - "left" or "right" - doesnt really matter except for troubleshooting
 
 #variables to remember whether the robot is currently turning or not
@@ -119,6 +121,9 @@ turning = None #None = not turning; "left" or "right" = turning that way
 turn_started = 0 #stores the time when the spin started
 turn_stage = None #track if moving forward or spinning
 spin_dir = None #which way we are actually spinning: "left" or "right"
+
+#True if this turn should reverse a little at the end (set by start_turn)
+reverse_after = False
 
 #becomes True once the middle sensors have come off the old line during the spin so the the agv doesnt end up back on the old line
 left_old_line = False
@@ -130,19 +135,21 @@ def spin(direction, speed):
     else:
         movement.spin_right(speed)
 
-def start_turn(direction, forward_first=True):
+def start_turn(direction, forward_first=True, reverse_at_end=False):
     #start a turn, either left, right or u_turn
     #forward_first = True means drive forward for a moment before spinning to get the wheels axle to the corner
     #forward_first = False means spin immediately without moving forward first
-    global turning, turn_stage, turn_started, left_old_line, spin_dir #global variables to remember what we are doing
+    #reverse_at_end = True means reverse a little once the turn is done (see reverse_after_turn_ms)
+    global turning, turn_stage, turn_started, left_old_line, spin_dir, reverse_after #global variables to remember what we are doing
 
     #if the direction is not a turn then stop movement
     if direction not in ("left", "right", "u_turn"):
         movement.stop()
         return
 
-    #remember which way we are turning
+    #remember which way we are turning, and whether to reverse a little at the end
     turning = direction
+    reverse_after = reverse_at_end
     left_old_line = False     #haven't left the old line yet
 
     #which way to spin
@@ -231,6 +238,13 @@ def update_turn():
             spin("left", search_speed)
         led.wait_ms(brake_ms)
         movement.stop()
+
+        #only when asked (turning onto the main line after leaving a slot/bay): reverse a little so the
+        #sensors are back behind the next junction, so line following sees it instead of being past it
+        if reverse_after and reverse_after_turn_ms > 0:
+            movement.move_backward()
+            led.wait_ms(reverse_after_turn_ms)
+            movement.stop()
 
         turning = None
         turn_stage = None

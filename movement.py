@@ -34,13 +34,14 @@ def slight_right():
         motor4.Forward(steer_speed)
 
 #functions to spin left and right on spot
+#(swapped after test_spin.py showed spin_left was turning the robot clockwise)
 def spin_left(speed=80):
-    motor3.Reverse(speed)
-    motor4.Forward(speed)
-
-def spin_right(speed=80):
     motor3.Forward(speed)
     motor4.Reverse(speed)
+
+def spin_right(speed=80):
+    motor3.Reverse(speed)
+    motor4.Forward(speed)
 
 def move_forward():
     if bay_mode:
