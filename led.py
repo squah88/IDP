@@ -6,9 +6,9 @@ from machine import Pin
 import time
 
 #pins
-amber_led = Pin(10, Pin.OUT)
-red_led = Pin(8, Pin.OUT)
-green_led = Pin(9, Pin.OUT)
+amber_led = Pin(8, Pin.OUT)
+red_led = Pin(9, Pin.OUT)
+green_led = Pin(10, Pin.OUT)
 
 #amber led
 def led_on():
