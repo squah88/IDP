@@ -16,6 +16,7 @@ import magnetsensor
 import distancesensor
 
 #tuning numbers
+box_approach_ms = 200     #at a bay: drive forward this long before grabbing, so the grabber reaches the box
 grab_turn_ms = 150        #before grabbing turn left this long so the grabber covers more of the bay
 grab_turn_speed = 60      #how fast to do that small turn
 after_grab_ms = 400       #after grabbing drive this much further in so the 180 turn can find the line again
@@ -36,9 +37,9 @@ approach_start = None     #when we started driving into the rack slot
 black_since = None        #when the sensors first saw all black on the way in (None = can see the line)
 check_start = 0           #when we stopped at the check point (we wait a moment before measuring)
 
-#create list of collection bays to track which ones are visited
-collection_bays= [17, 16, 38, 39]
-checked_bays = [] #list of collection bays already checked
+#the collection bays, in the order we visit them - we keep going round them because they get refilled
+collection_bays = [17, 16, 38, 39]
+next_bay = 0              #position in collection_bays of the bay to go to next (0 = bay 17)
  
 def arrived(node):
     #True once navigation has finished and we're at this node
@@ -52,77 +53,77 @@ def distance(node):
     return len(path)
  
 def collecting():
-    global step, bay, rack, level
-    
-    #error if the magnet sensor can't detect a pole
-    if step == "magnet_error":
-        return False
- 
-    #step 1: choose a bay and start driving there
+    #returns False while still working, True once a package is collected,
+    #or "empty" if the bay had no package (so main.py moves on to the next bay)
+    global step, bay, rack, level, next_bay
+
+    #step 1: choose the next bay (going round 17 -> 16 -> 38 -> 39 -> 17 ...) and start driving there
     if step is None:
-        bay = None
-        
-        #check if node has been collected from already 
-        for node in collection_bays:
-            if node not in checked_bays:
-                bay = node
-                #add to list as been checked 
-                checked_bays.append(bay)
-                break
-        
-        #go to bay
+        bay = collection_bays[next_bay]
+        next_bay = (next_bay + 1) % len(collection_bays)    #% wraps back to 0 after the last bay
+
         navigation.go_to(bay)
         step = "moving"
         return False
- 
+
     #step 2: still on the way
     if not arrived(bay):
         return False
- 
-    #step 3: arrived (at the T's bar) - turn a little left, grab, then turn back straight
+
+    #step 3: arrived (at the T's bar) - drive a bit further in, turn a little left and grab
     movement.bay_mode = False     #back to normal speed
+    movement.move_forward()
+    led.wait_ms(box_approach_ms)
+    movement.stop()
+
     movement.spin_left(grab_turn_speed)
     led.wait_ms(grab_turn_ms)
     movement.stop()
- 
+
     grabber.grab()
-    
-     #read magnet once box is collected 
-    pole= magnetsensor.read_magnet()
- 
+
+    #read magnet once box is collected
+    pole = magnetsensor.read_magnet()
+
     if pole == "north":
         level = "top"
         led.show_north()
- 
+
     elif pole == "south":
         level = "bottom"
         led.show_south()
- 
-    #for if no pole detected
+
+    #no pole detected = no package in this bay (not refilled yet)
     else:
-        movement.stop()
         led.pole_leds_off()
-        step= "magnet_error"
-        return False
- 
-    movement.spin_right(grab_turn_speed)     #turn back the same amount, so we're straight again
+        #put the grabber back down and open (lower first, so if something IS held it isn't dropped from high up)
+        grabber.lift.move_to(grabber.DOWN_ANGLE)
+        grabber.arm.move_to(grabber.OPEN_ANGLE_COLLECT)
+
+    #turn back the same amount, so we're straight again
+    movement.spin_right(grab_turn_speed)
     led.wait_ms(grab_turn_ms)
     movement.stop()
- 
+
     #now drive a bit further into the bay, so the u-turn after this ends up back on the line
     movement.move_forward()
     led.wait_ms(after_grab_ms)
     movement.stop()
- 
+
+    step = None                   #ready for the next state
+
+    #empty bay - tell main.py to try the next bay
+    if pole is None:
+        return "empty"
+
     #which rack: B if it came from a B bay, otherwise A
     if bay in mapping.collection_nodes["B"]:
         rack = "B"
     else:
         rack = "A"
- 
-    step = None                   #ready for the next state
+
     return True
- 
+
 def checking_spaces():
     #choose the NEAREST slot in the right rack that we haven't filled yet
     global target_slot
