@@ -124,6 +124,8 @@ ignore_180_ms = 1400 #how long we ignore line for 180 turn
 turn_timeout_ms = 4000  #if a turn takes longer than this, give up
 search_speed = 100 #spin speed once we start looking for the new line
 brake_ms = 40 #when the turn finds the line, spin backwards this long to stop overshooting
+reverse_after_turn_ms = 150 #after a left/right turn, reverse this long so the sensors move back BEHIND the next junction
+                            #(rack junctions are closer together than the sensors are in front of the wheels) - 0 = off
 u_turn_direction = "right" #which way U-turns spin - "left" or "right" - doesnt really matter except for troubleshooting
 
 #variables to remember whether the robot is currently turning or not
@@ -248,6 +250,13 @@ def update_turn():
             spin("left", search_speed)
         led.wait_ms(brake_ms)
         movement.stop()
+
+        #after a left/right turn, reverse a little so the sensors are back behind the next junction
+        #then line following will see that junction properly instead of already being on top of / past it
+        if turning != "u_turn" and reverse_after_turn_ms > 0:
+            movement.move_backward()
+            led.wait_ms(reverse_after_turn_ms)
+            movement.stop()
 
         turning = None
         turn_stage = None
