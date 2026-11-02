@@ -106,11 +106,11 @@ def following_line(next_node):
     return "following"
 
 #variables for what our robot does if at nodes
-forward_ms = 300 #time to move forward before spinning, in milliseconds
+forward_ms = 450 #time to move forward before spinning, in milliseconds
 ignore_line_ms = 300 # amount of time we ignore the sensors at the start of a left/right spin
 ignore_180_ms = 1400 #how long we ignore line for 180 turn
 turn_timeout_ms = 4000  #if a turn takes longer than this, give up
-search_speed = 70 #spin speed once we start looking for the new line
+search_speed = 100 #spin speed once we start looking for the new line
 brake_ms = 40 #when the turn finds the line, spin backwards this long to stop overshooting
 u_turn_direction = "right" #which way U-turns spin - "left" or "right" - doesnt really matter except for troubleshooting
 
@@ -239,3 +239,4 @@ def update_turn():
 
     # still turning, repeat function
     return False
+
