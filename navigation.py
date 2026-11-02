@@ -52,6 +52,7 @@ def plan_connection():
 
     #assign what each varibale of move is 
     action, next_node, wanted = move
+    linefollowing.show("AT NODE", current_node, "facing", heading, "-> going to", next_node, ":", action)
 
     #if action is straight go forward
     #change stage to clearing, so that when goto called it doesnt accept a new direction
@@ -90,9 +91,11 @@ def update():
             stage = "error"
 
         elif result:
-            #when true, we change the new direction our robot is in to what we wanted it to be and change stage
+            #when true, we change the new direction our robot is in to what we wanted it to be
             heading = wanted
-            stage = "clearing"
+            #go straight to line following (NOT clearing): after a turn the sensors are already past the junction
+            #we turned at, and clearing would skip the next junction if it's close (e.g. rack junctions 4 -> 5)
+            stage = "travelling"
         return
 
 #if we are clearing, it means we are moving off old junction

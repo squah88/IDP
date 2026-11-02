@@ -8,6 +8,15 @@ import time
 from mapping import line_end_nodes
 import movement
 
+#DEBUG: True = print what the robot sees and does (ONLY with the laptop plugged in - printing without the laptop makes the robot very slow)
+DEBUG = True
+last_seen = None    #last sensor reading we printed, so we only print when it changes
+
+def show(*parts):
+    #print only if DEBUG is on
+    if DEBUG:
+        print(*parts)
+
 #sensor pins
 OL = Pin(18, Pin.IN)
 IL = Pin(19, Pin.IN)
@@ -47,8 +56,11 @@ lost_since = None
 
 def following_line(next_node):
     #call global variables
-    global lost_since
+    global lost_since, last_seen
     OL, IL, IR, OR = read_sensors()
+    if (OL, IL, IR, OR) != last_seen:
+        show("  following to", next_node, "sensors:", (OL, IL, IR, OR))
+        last_seen = (OL, IL, IR, OR)
     
 
     #first find if a node is detected, this is when 1100, 1110, 0011, 0111 or 1111
@@ -143,6 +155,7 @@ def start_turn(direction, forward_first=True):
 
     #remember which way we are turning
     turning = direction
+    show("START TURN:", direction)
     left_old_line = False     #haven't left the old line yet
 
     #which way to spin
@@ -164,7 +177,7 @@ def start_turn(direction, forward_first=True):
 
 #this if for figuring out when turn is complete
 def update_turn():
-    global turning, turn_stage, turn_started, left_old_line
+    global turning, turn_stage, turn_started, left_old_line, last_seen
 
     #no turn is in progress, just return
     if turning is None:
@@ -172,6 +185,10 @@ def update_turn():
 
     #calculate the time that has elapseed from us starting timer in start turn and current time
     elapsed = time.ticks_diff(time.ticks_ms(), turn_started)
+    seen = read_sensors()
+    if seen != last_seen:
+        show("  ", turn_stage, elapsed, "ms sensors:", seen)
+        last_seen = seen
 
     #first, move forward for forward_ms
     if turn_stage == "forward":
@@ -239,4 +256,3 @@ def update_turn():
 
     # still turning, repeat function
     return False
-
