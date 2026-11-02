@@ -11,6 +11,7 @@ heading = "E"
 target = None
 next_node = None
 wanted = None
+came_from = None    #the node we were at before this one (to know if we just left a slot or bay)
 
 #set current stage we are at- idle, turning, travelling (following line to next node), clearing (moving off old junctino)
 stage = "idle"
@@ -18,7 +19,7 @@ stage = "idle"
 #create function that accepts a destination to go to 
 #this function ensures we do not assign a new action before first action carried out
 def go_to(destination):
-    global target
+    global target, came_from
 
     #only accept a new destination when stopped at a known node so if not idle at a node do not continues
     if stage != "idle":
@@ -26,6 +27,7 @@ def go_to(destination):
 
     #set our target to destination point
     target = destination
+    came_from = None
     #plan first connection node
     plan_connection()
     return True
@@ -62,12 +64,15 @@ def plan_connection():
 
     #if action is not straight, then turn and change stage
     else:
-        linefollowing.start_turn(action)
+        #just come out of a rack slot or bay onto the main line? the next junction is very close,
+        #so ask the turn to reverse a little at the end (see reverse_after_turn_ms in linefollowing.py)
+        left_dead_end = came_from in mapping.line_end_nodes or came_from in mapping.collection_nodes["A"] or came_from in mapping.collection_nodes["B"]
+        linefollowing.start_turn(action, reverse_at_end=left_dead_end)
         stage = "turning"
 
 #function to update the stage robot is in, so it knows when done action and can get next instuction
 def update():
-    global stage, current_node, heading
+    global stage, current_node, heading, came_from
 
     #if stage is already idle or if it is an error, it jsut returns function ie. do nothing
     if stage == "idle" or stage == "error":
@@ -93,9 +98,7 @@ def update():
         elif result:
             #when true, we change the new direction our robot is in to what we wanted it to be
             heading = wanted
-            #go straight to line following (NOT clearing): after a turn the sensors are already past the junction
-            #we turned at, and clearing would skip the next junction if it's close (e.g. rack junctions 4 -> 5)
-            stage = "travelling"
+            stage = "clearing"
         return
 
 #if we are clearing, it means we are moving off old junction
@@ -144,6 +147,7 @@ def update():
         if result == "node":
             #assume the next detected node is the expected one, ie. the node we travelled to
             #update this, direction and node
+            came_from = current_node
             current_node = next_node
             heading = wanted
 
