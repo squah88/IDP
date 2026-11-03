@@ -649,3 +649,4 @@ class VL53L0X:
         self._register(SYSTEM_INTERRUPT_CLEAR, 0x01)
         self._register(SYSRANGE_START, 0x00)
         return True
+

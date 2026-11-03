@@ -31,13 +31,14 @@ while True:
         #change running to the opposite of what it was before
         #toggle if on or off based on if button was clicked
         running = not running
-
+        led.pole_leds_off()
+        led.led_off()
+        grabber.reset_grabber()
+        
         if not running:
             #if running and button pressed, then not running
             movement.stop()
-            led.pole_leds_off()
-            grabber.reset_grabber()
-            led.led_off()
+
 
         else:
             #if robot is on, then set robot to be at start node facing north
