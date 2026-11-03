@@ -51,3 +51,4 @@ def show_south():
 def pole_leds_off():
     red_led.value(0)
     green_led.value(0)
+

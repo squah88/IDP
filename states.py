@@ -16,14 +16,14 @@ import magnetsensor
 import distancesensor
 
 #tuning numbers
-box_approach_ms = 200     #at a bay: drive forward this long before grabbing, so the grabber reaches the box
+box_approach_ms = 350     #at a bay: drive forward this long before grabbing, so the grabber reaches the box
 grab_turn_ms = 150        #before grabbing turn left this long so the grabber covers more of the bay
 grab_turn_speed = 60      #how fast to do that small turn
-after_grab_ms = 400       #after grabbing drive this much further in so the 180 turn can find the line again
+after_grab_ms = 100       #after grabbing drive this much further in so the 180 turn can find the line again
 back_off_ms = 400         #after releasing, reverse this long so we don't hit the package when we turn
-slot_max_ms = 3350        #driving into a rack slot: stop after this long even if the line hasn't ended
-check_drive_ms = 1000     #driving into a slot: drive this long, then stop and check if the slot is full - TODO: tune
-occupied_mm = 150         #at the check point: closer than this = a package is already there - TODO: measure with testdistance.py
+slot_max_ms = 3150        #driving into a rack slot: stop after this long even if the line hasn't ended
+check_drive_ms = 2000     #driving into a slot: drive this long, then stop and check if the slot is full - TODO: tune
+occupied_mm = 200         #at the check point: closer than this = a package is already there - TODO: measure with testdistance.py
 settle_before_check_ms = 300   #after stopping at the check point, wait this long before measuring
 
 #memory

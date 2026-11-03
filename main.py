@@ -35,6 +35,8 @@ while True:
         if not running:
             #if running and button pressed, then not running
             movement.stop()
+            led.pole_leds_off()
+            grabber.reset_grabber()
             led.led_off()
 
         else:

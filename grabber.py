@@ -10,7 +10,7 @@ UP_ANGLE = 220              #grabber at top
 DOWN_ANGLE = 40           #grabber at bottom
 OPEN_ANGLE_COLLECT = 40    #grabber fully opened
 OPEN_ANGLE_DROPOFF = 77    #drops parcel
-CLOSED_ANGLE = 97          #grabber closed
+CLOSED_ANGLE = 93          #grabber closed
 
 STEP_MS = 10               #servos move 1 degree every STEP_MS - greater = slower and gentler
 
@@ -42,8 +42,6 @@ arm = Servo(15, OPEN_ANGLE_COLLECT)
 
 def grab():
     #pick up the package
-    lift.move_to(DOWN_ANGLE)
-    arm.move_to(OPEN_ANGLE_COLLECT)
     arm.move_to(CLOSED_ANGLE)
     lift.move_to(UP_ANGLE)
 
@@ -56,3 +54,5 @@ def reset_grabber():
     #reset grabber to starting position
     arm.move_to(OPEN_ANGLE_COLLECT)
     lift.move_to(DOWN_ANGLE)
+    
+

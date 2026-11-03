@@ -112,7 +112,7 @@ ignore_180_ms = 1400 #how long we ignore line for 180 turn
 turn_timeout_ms = 4000  #if a turn takes longer than this, give up
 search_speed = 100 #spin speed once we start looking for the new line
 brake_ms = 40 #when the turn finds the line, spin backwards this long to stop overshooting
-reverse_after_turn_ms = 150 #ONLY when turning onto the main line after leaving a slot/bay: reverse this long afterwards
+reverse_after_turn_ms = 300 #ONLY when turning onto the main line after leaving a slot/bay: reverse this long afterwards
                             #so the sensors move back behind the next junction (rack junctions are very close) - 0 = off
 u_turn_direction = "right" #which way U-turns spin - "left" or "right" - doesnt really matter except for troubleshooting
 
