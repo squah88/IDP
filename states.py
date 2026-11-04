@@ -13,7 +13,6 @@ import led
 import time
 import linefollowing
 import magnetsensor
-import distancesensor
 
 #tuning numbers
 box_approach_ms = 350     #at a bay: drive forward this long before grabbing, so the grabber reaches the box
@@ -22,15 +21,22 @@ grab_turn_speed = 60      #how fast to do that small turn
 after_grab_ms = 100       #after grabbing drive this much further in so the 180 turn can find the line again
 back_off_ms = 400         #after releasing, reverse this long so we don't hit the package when we turn
 slot_max_ms = 3150        #driving into a rack slot: stop after this long even if the line hasn't ended
-check_drive_ms = 2000     #driving into a slot: drive this long, then stop and check if the slot is full - TODO: tune
-occupied_mm = 200         #at the check point: closer than this = a package is already there - TODO: measure with testdistance.py
+check_drive_ms = 2000     #driving into a slot: drive this long, then stop and check if the slot is full
+occupied_mm = 200         #at the check point: closer than this = a package is already there
 settle_before_check_ms = 300   #after stopping at the check point, wait this long before measuring
+sensor_retry_ms = 1000    #if the distance sensor gives no reading, keep trying this long before assuming the slot is full
+
+use_distance_sensor = True     #False = don't check slots, just drive in (only remembers slots WE filled)
+
+#only set up the distance sensor if we're using it (setting it up crashes if it's unplugged)
+if use_distance_sensor:
+    import distancesensor
 
 #memory
 step = None               #where we are inside the current state: None = not started, "moving" = on the way
 bay = None                #the collection bay we're going to
 rack = None               #A or B
-level = "bottom"          #top or bottom - TODO: read the magnet. bottom for now until we sort sensor out
+level = "bottom"          #top or bottom
 target_slot = None        #the rack slot we chose
 occupied_slots = []       #slots that are full
 approach_start = None     #when we started driving into the rack slot
@@ -209,7 +215,12 @@ def delivering():
         if not drive_into_slot(check_drive_ms):
             return False                          #still driving
         check_start = time.ticks_ms()
-        step = "checking"
+        if use_distance_sensor:
+            step = "checking"                     #stop and measure
+        else:
+            approach_start = time.ticks_ms()      #no sensor - carry straight on into the slot
+            black_since = None
+            step = "driving_in"
         return False
 
     #step 4: stop and measure the distance to whatever is in front
@@ -222,8 +233,11 @@ def delivering():
 
         reading = distancesensor.read_distance()
 
+        #no reading - try again next loop, for up to sensor_retry_ms
         if reading is None:
-            return "error"
+            if time.ticks_diff(time.ticks_ms(), check_start) < settle_before_check_ms + sensor_retry_ms:
+                return False                  #try again next time round
+            reading = 0                       #still nothing - assume the slot is full, so we don't hit a box
 
         if reading < occupied_mm:
             #something close in front of us = a package is already in this slot
