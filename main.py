@@ -6,6 +6,7 @@ import linefollowing
 import states
 import mapping
 import navigation
+import grabber
 
 #if the program was stopped while driving, make sure everything is off
 movement.stop()
@@ -32,8 +33,8 @@ while True:
         #toggle if on or off based on if button was clicked
         running = not running
         led.pole_leds_off()
-        led.led_off()
         grabber.reset_grabber()
+        led.led_off()          #after the grabber moves, so amber is definitely off
         
         if not running:
             #if running and button pressed, then not running
@@ -62,6 +63,7 @@ while True:
             states.step = None
             states.next_bay = 0
             states.occupied_slots = []
+            states.delivered_count = 0
 
         #restart
             state = "collecting"
@@ -112,8 +114,11 @@ while True:
                 result = states.delivering()
                 
                 if result == "delivered":
-                    #bays get refilled, so keep going round them until the stop button is pressed
-                    state = "collecting"
+                    #delivered enough boxes? go back to the start, otherwise collect the next one
+                    if states.delivered_count >= states.boxes_to_deliver:
+                        state = "return_start"
+                    else:
+                        state = "collecting"
 
 
                 elif result == "occupied":

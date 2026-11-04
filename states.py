@@ -21,8 +21,8 @@ grab_turn_speed = 60      #how fast to do that small turn
 after_grab_ms = 100       #after grabbing drive this much further in so the 180 turn can find the line again
 back_off_ms = 400         #after releasing, reverse this long so we don't hit the package when we turn
 slot_max_ms = 3150        #driving into a rack slot: stop after this long even if the line hasn't ended
-check_drive_ms = 2000     #driving into a slot: drive this long, then stop and check if the slot is full
-occupied_mm = 200         #at the check point: closer than this = a package is already there
+check_drive_ms = 2000     #driving into a slot: drive this long, then stop and check if the slot is full - TODO: tune
+occupied_mm = 200         #at the check point: closer than this = a package is already there - TODO: measure with testdistance.py
 settle_before_check_ms = 300   #after stopping at the check point, wait this long before measuring
 sensor_retry_ms = 1000    #if the distance sensor gives no reading, keep trying this long before assuming the slot is full
 
@@ -36,7 +36,7 @@ if use_distance_sensor:
 step = None               #where we are inside the current state: None = not started, "moving" = on the way
 bay = None                #the collection bay we're going to
 rack = None               #A or B
-level = "bottom"          #top or bottom
+level = "bottom"          #top or bottom - TODO: read the magnet. bottom for now until we sort sensor out
 target_slot = None        #the rack slot we chose
 occupied_slots = []       #slots that are full
 approach_start = None     #when we started driving into the rack slot
@@ -46,6 +46,8 @@ check_start = 0           #when we stopped at the check point (we wait a moment 
 #the collection bays, in the order we visit them - we keep going round them because they get refilled
 collection_bays = [17, 16, 38, 39]
 next_bay = 0              #position in collection_bays of the bay to go to next (0 = bay 17)
+boxes_to_deliver = 4      #after delivering this many boxes, go back to the start
+delivered_count = 0       #how many boxes we've delivered so far
  
 def arrived(node):
     #True once navigation has finished and we're at this node
@@ -191,7 +193,7 @@ def delivering():
     #returns False while still working, "error" if something went wrong
     #we check from INSIDE the slot because the distance sensor sees in a cone,
     #so from the junction it would see the boxes in the slots either side too
-    global step, approach_start, black_since, check_start
+    global step, approach_start, black_since, check_start, delivered_count
 
     #step 1: start the journey to the slot
     if step is None:
@@ -277,6 +279,7 @@ def delivering():
         led.pole_leds_off()                       #package delivered - pole lights off
 
         occupied_slots.append(target_slot)        #we just filled this slot
+        delivered_count += 1                      #one more box delivered
         step = None
         return "delivered"
 
