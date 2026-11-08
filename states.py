@@ -1,9 +1,9 @@
-#the robot's states
-#each function does a tiny bit each call and returns True only when its whole job is done
+#the agv's states
 #collecting -> checking_spaces -> delivering -> return_start
 #navigation works in the background (main.py calls navigation.update()):
-#navigation.go_to(node) STARTS a journey and returns straight away
+#navigation.go_to(node) starts a journey and returns straight away
 #we know we've arrived when navigation.stage == "idle" and navigation.current_node == node
+#packages from bays 16/17 go to rack B, from bays 38/39 go to rack A
 
 import navigation
 import mapping
@@ -21,29 +21,30 @@ grab_turn_speed = 60      #how fast to do that small turn
 after_grab_ms = 100       #after grabbing drive this much further in so the 180 turn can find the line again
 back_off_ms = 400         #after releasing, reverse this long so we don't hit the package when we turn
 slot_max_ms = 3150        #driving into a rack slot: stop after this long even if the line hasn't ended
-check_drive_ms = 2000     #driving into a slot: drive this long, then stop and check if the slot is full - TODO: tune
-occupied_mm = 200         #at the check point: closer than this = a package is already there - TODO: measure with testdistance.py
+check_drive_ms = 2000     #driving into a slot: drive this long, then stop and check if the slot is full 
+occupied_mm = 200         #at the check point: closer than this = a package is already there
 settle_before_check_ms = 300   #after stopping at the check point, wait this long before measuring
 sensor_retry_ms = 1000    #if the distance sensor gives no reading, keep trying this long before assuming the slot is full
 
-use_distance_sensor = True     #False = don't check slots, just drive in (only remembers slots WE filled)
+#basically a switch to turn on/off the distance sensor
+use_distance_sensor = True     #False = don't check slots, just drive in (only remembers slots we filled)
 
-#only set up the distance sensor if we're using it (setting it up crashes if it's unplugged)
+#only set up the distance sensor if we're using it
 if use_distance_sensor:
     import distancesensor
 
 #memory
-step = None               #where we are inside the current state: None = not started, "moving" = on the way
+step = None               #where we are inside the current state: None = not started
 bay = None                #the collection bay we're going to
 rack = None               #A or B
-level = "bottom"          #top or bottom - TODO: read the magnet. bottom for now until we sort sensor out
+level = "bottom"          #top or bottom
 target_slot = None        #the rack slot we chose
 occupied_slots = []       #slots that are full
 approach_start = None     #when we started driving into the rack slot
 black_since = None        #when the sensors first saw all black on the way in (None = can see the line)
 check_start = 0           #when we stopped at the check point (we wait a moment before measuring)
 
-#the collection bays, in the order we visit them - we keep going round them because they get refilled
+#the collection bays, in the order we visit them
 collection_bays = [17, 16, 38, 39]
 next_bay = 0              #position in collection_bays of the bay to go to next (0 = bay 17)
 boxes_to_deliver = 4      #after delivering this many boxes, go back to the start
@@ -57,7 +58,7 @@ def distance(node):
     #how many nodes away this node is from where we are now (used to pick the nearest one)
     path = mapping.find_path(mapping.mapping, navigation.current_node, node)
     if path is None:
-        return 999                # no route - treat as very far away
+        return 999                #no route - treat as very far away
     return len(path)
  
 def collecting():
@@ -78,7 +79,7 @@ def collecting():
     if not arrived(bay):
         return False
 
-    #step 3: arrived (at the T's bar) - drive a bit further in, turn a little left and grab
+    #step 3: arrived at the bay - drive a bit further in, turn a little left and grab
     movement.bay_mode = False     #back to normal speed
     movement.move_forward()
     led.wait_ms(box_approach_ms)
@@ -90,7 +91,7 @@ def collecting():
 
     grabber.grab()
 
-    #read magnet once box is collected
+    #step 4: read the magnet in the package to find which rack level it goes to
     pole = magnetsensor.read_magnet()
 
     if pole == "north":
@@ -104,21 +105,20 @@ def collecting():
     #no pole detected = no package in this bay (not refilled yet)
     else:
         led.pole_leds_off()
-        #put the grabber back down and open (lower first, so if something IS held it isn't dropped from high up)
-        grabber.lift.move_to(grabber.DOWN_ANGLE)
-        grabber.arm.move_to(grabber.OPEN_ANGLE_COLLECT)
+        grabber.lift.move_to(grabber.down_angle)
+        grabber.arm.move_to(grabber.open_angle_collect)
 
     #turn back the same amount, so we're straight again
     movement.spin_right(grab_turn_speed)
     led.wait_ms(grab_turn_ms)
     movement.stop()
 
-    #now drive a bit further into the bay, so the u-turn after this ends up back on the line
+    #drive a bit further into the bay so the u-turn after this ends up back on the line
     movement.move_forward()
     led.wait_ms(after_grab_ms)
     movement.stop()
 
-    step = None                   #ready for the next state
+    step = None          #ready for the next state
 
     #empty bay - tell main.py to try the next bay
     if pole is None:
@@ -133,19 +133,20 @@ def collecting():
     return True
 
 def checking_spaces():
-    #choose the NEAREST slot in the right rack that we haven't filled yet
+    #choose the nearest slot on the right rack and level that isn't known to be full
+    #returns True if a slot was found, False if every slot is full
     global target_slot
-    slots = mapping.storage_nodes[rack + "_" + level]      # e.g. "B" + "_" + "bottom" = "B_bottom"
+    slots = mapping.storage_nodes[rack + "_" + level]      #e.g. "B" + "_" + "bottom" = "B_bottom"
 
     target_slot = None
     for slot in slots:
         if slot in occupied_slots:
-            continue              #already filled, skip it
+            continue              #already full, skip it
         if target_slot is None or distance(slot) < distance(target_slot):
             target_slot = slot    #nearest so far
- 
+
     return target_slot is not None
- 
+
 def drive_into_slot(limit_ms):
     #one step of driving into the rack slot, following the line with steering
     #returns True when we should stop: the line has ended or we've been driving for limit_ms
@@ -171,28 +172,25 @@ def drive_into_slot(limit_ms):
 
     #otherwise keep the line between the middle sensors
     if IL == 1 and IR == 0:
-        movement.slight_left()      #line is to the left
+        movement.slight_left()
     elif IR == 1 and IL == 0:
-        movement.slight_right()     #line is to the right
+        movement.slight_right()
     else:
         movement.move_forward()
     return False
 
 def arrive_at_slot():
     #tell navigation we are now at the slot, facing into it, and stopped
-    #(navigation can't see this itself because we took over the driving)
     movement.bay_mode = False             #back to normal speed
     navigation.current_node = target_slot
-    navigation.heading = navigation.wanted
+    navigation.facing = navigation.wanted
     navigation.stage = "idle"
 
 def delivering():
-    #steps: drive to the slot -> drive partway in -> stop and measure distance
+    #drive to the slot -> drive partway in -> stop and measure distance
     #slot empty: drive the rest of the way in, drop the package, back off -> returns "delivered"
-    #slot full: back off, then try another slot (navigation u-turns out next time) -> returns "occupied"
+    #slot full: back off, then try another slot -> returns "occupied"
     #returns False while still working, "error" if something went wrong
-    #we check from INSIDE the slot because the distance sensor sees in a cone,
-    #so from the junction it would see the boxes in the slots either side too
     global step, approach_start, black_since, check_start, delivered_count
 
     #step 1: start the journey to the slot
@@ -238,11 +236,11 @@ def delivering():
         #no reading - try again next loop, for up to sensor_retry_ms
         if reading is None:
             if time.ticks_diff(time.ticks_ms(), check_start) < settle_before_check_ms + sensor_retry_ms:
-                return False                  #try again next time round
-            reading = 0                       #still nothing - assume the slot is full, so we don't hit a box
+                return False                      #try again next time round
+            reading = 0                           #0 = full as its safer to assume the slot is full, 9999 = empty
 
         if reading < occupied_mm:
-            #something close in front of us = a package is already in this slot
+            #a package is already in this slot
             occupied_slots.append(target_slot)
 
             #back away so there is room to turn round
@@ -276,7 +274,7 @@ def delivering():
         movement.stop()
 
         grabber.reset_grabber()
-        led.pole_leds_off()                       #package delivered - pole lights off
+        led.pole_leds_off()                       #package delivered - pole LED off
 
         occupied_slots.append(target_slot)        #we just filled this slot
         delivered_count += 1                      #one more box delivered
@@ -286,16 +284,17 @@ def delivering():
     return False
 
 def return_start():
+    #drive back to the start box (node 0) - returns True once we're there
     global step
- 
+
     if step is None:
         navigation.go_to(mapping.home_node)
         step = "moving"
         return False
- 
+
     if not arrived(mapping.home_node):
         return False
- 
+
     movement.stop()
     step = None
     return True

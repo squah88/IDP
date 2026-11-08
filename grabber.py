@@ -1,18 +1,18 @@
 #grabber picks up and puts down the package using 2 servos
-#lift servo = turns a gear that moves the grabber vertically
-#arm servo  = swings the right arm and the left still but might change to left
+#lift servo (GP13, connector J36) turns a gear that moves the grabber up and down
+#arm servo (GP15, connector J35) swings the grabber arm open and closed
 
 from machine import Pin, PWM
 import led
 
 #important angles
-UP_ANGLE = 220              #grabber at top
-DOWN_ANGLE = 40           #grabber at bottom
-OPEN_ANGLE_COLLECT = 40    #grabber fully opened
-OPEN_ANGLE_DROPOFF = 77    #drops parcel
-CLOSED_ANGLE = 93          #grabber closed
+up_angle = 220            #grabber at top
+down_angle = 40           #grabber at bottom
+open_angle_collect = 40   #grabber fully opened
+open_angle_dropoff = 77   #drops parcel
+closed_angle = 93         #grabber closed
 
-STEP_MS = 10               #servos move 1 degree every STEP_MS - greater = slower and gentler
+step_ms = 10              #servos move 1 degree every step_ms (bigger = slower and gentler)
 
 class Servo:
     #servo class to control the grabber and arm servos
@@ -34,25 +34,22 @@ class Servo:
                 self.set(self.angle + 1)
             else:
                 self.set(self.angle - 1)
-            led.wait_ms(STEP_MS)
+            led.wait_ms(step_ms)
 
 #always start with the grabber down and the arm open
-lift = Servo(13, DOWN_ANGLE)
-arm = Servo(15, OPEN_ANGLE_COLLECT)
+lift = Servo(13, down_angle)
+arm = Servo(15, open_angle_collect)
 
 def grab():
     #pick up the package
-    arm.move_to(CLOSED_ANGLE)
-    lift.move_to(UP_ANGLE)
-
+    arm.move_to(closed_angle)
+    lift.move_to(up_angle)
 
 def release():
-    #put the package down
-    arm.move_to(OPEN_ANGLE_DROPOFF)
+    #drop the package
+    arm.move_to(open_angle_dropoff)
     
 def reset_grabber():
     #reset grabber to starting position
-    arm.move_to(OPEN_ANGLE_COLLECT)
-    lift.move_to(DOWN_ANGLE)
-    
-
+    arm.move_to(open_angle_collect)
+    lift.move_to(down_angle)

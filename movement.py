@@ -1,22 +1,21 @@
 #this contains all the functions for what way the robot is turning and how it is moving
+
 from motor import Motor
 
-motor3 = Motor(dirPin=4, PWMPin=5)  # LEFT wheel  - Motor Driv2 #1, on GP4/5
-motor4 = Motor(dirPin=7, PWMPin=6)  # RIGHT wheel - Motor Driv2 #2, on GP6/7
-#left wheel to J40 orange red
-#rght wheel to J39 orange red
+motor3 = Motor(dirPin=4, PWMPin=5)  #left wheel - direction GP4, speed (PWM) GP5, connector J40
+motor4 = Motor(dirPin=7, PWMPin=6)  #right wheel - direction GP7, speed (PWM) GP6, connector J39
 
 #how fast the slower wheel goes when steering (0-100)
 #bigger = gentler corrections, smaller = sharper corrections
 steer_speed = 50
 
-#BAY MODE - used on the short line into a collection bay
+#bay mode - slower with stronger steering, used on the lines into collection bays and rack slots
 bay_mode = False
 bay_speed = 75            #speed of the fast wheel in bay mode and both wheels going straight
 bay_steer_speed = 30      #speed of the slow wheel when steering in bay mode
 
-#to steer LEFT, slow the LEFT wheel (motor3)
 def slight_left():
+    #steer left by slowing the left wheel
     if bay_mode:
         motor3.Forward(bay_steer_speed)
         motor4.Forward(bay_speed)
@@ -24,8 +23,8 @@ def slight_left():
         motor3.Forward(steer_speed)
         motor4.Forward()
 
-#to steer RIGHT, slow the RIGHT wheel (motor4)
 def slight_right():
+    #steer right by slowing the right wheel
     if bay_mode:
         motor3.Forward(bay_speed)
         motor4.Forward(bay_steer_speed)
@@ -34,7 +33,6 @@ def slight_right():
         motor4.Forward(steer_speed)
 
 #functions to spin left and right on spot
-#(swapped after test_spin.py showed spin_left was turning the robot clockwise)
 def spin_left(speed=80):
     motor3.Forward(speed)
     motor4.Reverse(speed)

@@ -1,10 +1,14 @@
+#runs automatically when the pico powers on
+#waits for the button to be pressed
+#while running, it flashes the amber LED, calls navigation.update() to update the agv's journey, and calls the function for the current state in states.py
+#order of states: collecting -> checking_spaces -> delivering -> return_start
+
 import time
 import movement
 import led
 from machine import Pin
 import linefollowing
 import states
-import mapping
 import navigation
 import grabber
 
@@ -12,48 +16,41 @@ import grabber
 movement.stop()
 led.led_off()
 
-#set button pin to be an input, the pin pull up mean the button is high normally
+#start/stop button on GP27 - PULL_UP means it reads 1 normally and 0 when pressed
 button = Pin(27, Pin.IN, Pin.PULL_UP)
 
-running = False #keeps track of if robot is on or off, start with off
-previous_state = 1 #keeps track of the button state, start with high because button is not pressed
-
-#1 = not pressed and 0 = pressed
-#set loop that runs always using while True:
-#set starting state of robot
-state = "collecting"
+running = False         #is the robot on? starts off until the button is pressed
+previous_state = 1      #keeps track of the button state, start with high because button is not pressed
+state = "collecting"    #the current state of the robot
 
 while True:
-    #set that current_state is equal to the button value
     current_state = button.value()
     
-    #detect a new press: released (1) to pressed (0)
+    #detect a new press: not pressed (1) to pressed (0)
     if previous_state == 1 and current_state == 0:
-        #change running to the opposite of what it was before
-        #toggle if on or off based on if button was clicked
-        running = not running
+        running = not running   #toggle the running state
+
+        #put everything back to the start state
         led.pole_leds_off()
         grabber.reset_grabber()
-        led.led_off()          #after the grabber moves, so amber is definitely off
+        led.led_off()
         
         if not running:
-            #if running and button pressed, then not running
+            #agv was just turned off
             movement.stop()
 
-
         else:
-            #if robot is on, then set robot to be at start node facing north
-            #should be in idle state at start
+            #robot was just turned on - it starts at node 0 (start box) facing north
             navigation.current_node = 0
-            navigation.heading = "E"
+            navigation.facing = "N"
             navigation.stage = "idle"
 
-        #clear what the target destinations are
+        #clear any old journey data
             navigation.target = None
             navigation.next_node = None
             navigation.wanted = None
 
-        #clear any interrupted turn, ie. reset everything to start
+        #clear any interrupted turn
             linefollowing.turning = None
             linefollowing.turn_stage = None
             linefollowing.turn_started = 0
@@ -65,33 +62,31 @@ while True:
             states.occupied_slots = []
             states.delivered_count = 0
 
-        #restart
+        #start from beginning
             state = "collecting"
 
         time.sleep(0.2)  #debounce
 
-    #update previous_state to be equal to current_state for the next loop
     previous_state = current_state
 
-    #set condition for if running
     if running:
-        led.update_flash()  #update the led flash while running
+        led.update_flash()  #amber LED flashes while the robot is running
 
-        #update journery requested, depending on the state we are in 
+        #update journey
         navigation.update()
 
-        #make it stop if theres an error
+        #stop agv if theres an error
         if navigation.stage == "error":
             movement.stop()
             led.led_off()
             running=False
 
         else:
-         #this sets the order of states that needs to be followed, provided it has completed prior state
+         #run the current state - each one returns a result telling us when to move to the next state
             if state == "collecting":
                 result = states.collecting()
 
-                #got a package - find a slot for it
+                #got a package - choose a slot for it
                 if result is True:
                     state = "checking_spaces"
 
@@ -103,14 +98,13 @@ while True:
                 if states.checking_spaces():
                     state = "delivering"
 
-                #if no availble slots in this rack
+                #if no free slots left on this rack level - stop
                 else:
                     movement.stop()
                     led.led_off()
                     running = False
 
             elif state == "delivering":
-                #keep track if package was delivered
                 result = states.delivering()
                 
                 if result == "delivered":
@@ -120,9 +114,8 @@ while True:
                     else:
                         state = "collecting"
 
-
+                #if the slot was occupied, choose another slot
                 elif result == "occupied":
-            # find another slot in the same rack
                     state = "checking_spaces"
 
                 elif result == "error":
@@ -131,6 +124,7 @@ while True:
                     running = False
 
             elif state == "return_start":
+                #back in the start box - stop and finish
                 if states.return_start():
                     movement.stop()
                     led.led_off()

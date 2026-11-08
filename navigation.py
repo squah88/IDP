@@ -1,3 +1,5 @@
+#takes the robot from node to node along a route
+
 import mapping
 import time
 import linefollowing
@@ -5,88 +7,78 @@ import movement
 
 #where the robot is and which way it faces (main.py sets these when the button is pressed)
 current_node = 0
-heading = "E"
+facing = "N"
 
-#set what our target is and what the next node is to get to target is and the wanted direction we want to point
-target = None
-next_node = None
-wanted = None
+target = None       #the node we are going to
+next_node = None    #the next node on the route
+wanted = None       #the compass direction we need to face to reach next_node
 came_from = None    #the node we were at before this one (to know if we just left a slot or bay)
 
-#set current stage we are at- idle, turning, travelling (following line to next node), clearing (moving off old junctino)
 stage = "idle"
 
-#create function that accepts a destination to go to 
-#this function ensures we do not assign a new action before first action carried out
 def go_to(destination):
+    #start a journey to destination - returns False if we're already busy with one
     global target, came_from
 
-    #only accept a new destination when stopped at a known node so if not idle at a node do not continues
+    #only accept a new destination when stopped at a known node
     if stage != "idle":
         return False
 
-    #set our target to destination point
     target = destination
     came_from = None
-    #plan first connection node
-    plan_connection()
+    plan_connection()    #plan the first step
     return True
 
-
-#plan next action
 def plan_connection():
+    #plan and start the next step of the route (straight on, or a turn)
     global stage, next_node, wanted
 
-    #start for if the destination is already at node, just go idle
+    #already at the destination - finished
     if current_node == target:
         movement.stop()
         stage = "idle"
         return
 
-    #choose the next connection, set move to equal new action, new node, new direction
-    move = mapping.plan_move(current_node, target, heading)
+    #ask mapping for the next move: which turn, which node, which direction
+    move = mapping.plan_move(current_node, target, facing)
 
-    #if there is no move, then no route found
+    #no route found
     if move is None:
         movement.stop()
         stage = "error"
         return
 
-    #assign what each varibale of move is 
     action, next_node, wanted = move
 
-    #if action is straight go forward
-    #change stage to clearing, so that when goto called it doesnt accept a new direction
+    #straight on so just drive off the junction
     if action == "straight":
         movement.move_forward()
         stage = "clearing"
 
-    #if action is not straight, then turn and change stage
+    #left, right or u-turn
     else:
-        #just come out of a rack slot or bay onto the main line? the next junction is very close,
-        #so ask the turn to reverse a little at the end (see reverse_after_turn_ms in linefollowing.py)
+        #if the agv just came out of a rack slot or bay onto the main line the next junction is very close so ask the turn to reverse a bit at the end
         left_dead_end = came_from in mapping.line_end_nodes or came_from in mapping.collection_nodes["A"] or came_from in mapping.collection_nodes["B"]
         linefollowing.start_turn(action, reverse_at_end=left_dead_end)
         stage = "turning"
 
-#function to update the stage robot is in, so it knows when done action and can get next instuction
 def update():
-    global stage, current_node, heading, came_from
+    #update the robot's journey - called every loop from main.py
+    global stage, current_node, facing, came_from
 
-    #if stage is already idle or if it is an error, it jsut returns function ie. do nothing
+    #nothing to do
     if stage == "idle" or stage == "error":
         return
 
     #bay mode on while we're driving into a collection bay
-    #(states.py also switches it on while driving into a rack slot)
+    #states.py also switches it on while driving into a rack slot
     if stage == "turning":
         movement.bay_mode = False
     elif stage == "clearing" or stage == "travelling":
         movement.bay_mode = next_node in mapping.collection_nodes["A"] or next_node in mapping.collection_nodes["B"]
 
-#if we are turning
+    #if we are turning
     if stage == "turning":
-        #continue the requested turn until aligned
         result = linefollowing.update_turn()
 
         #turn gave up
@@ -94,24 +86,23 @@ def update():
             movement.stop()
             stage = "error"
 
+        #turn finished
         elif result:
-            #when true, we change the new direction our robot is in to what we wanted it to be and change stage
-            heading = wanted
+            facing = wanted
             stage = "clearing"
         return
 
-#if we are clearing, it means we are moving off old junction
-#we need to start moving forward beffore tracking, to prevent it from reading the same junction
+    #clearing - drive off the old junction before looking for the next one
     if stage == "clearing":
-        #move off the current junction before detecting another
-        #start by reading the sensors
         OL, IL, IR, OR = linefollowing.read_sensors()
 
         #all black for too long = we've driven off the line
         if OL == 0 and IL == 0 and IR == 0 and OR == 0:
+
             #if we have just lost the line, start a timer
             if linefollowing.lost_since is None:
                 linefollowing.lost_since = time.ticks_ms()
+
             #if we've been off the line for too long, stop and error
             elif time.ticks_diff(time.ticks_ms(), linefollowing.lost_since) > linefollowing.lost_limit_ms:
                 movement.stop()
@@ -121,8 +112,7 @@ def update():
         else:
             linefollowing.lost_since = None
 
-        #move forward, but straighten up using the middle two sensors (outer ones are ignored here)
-        #this fixes a turn that finished slightly crooked
+        #move forward, straightening up with the middle two sensors (fixes a turn that finished crooked)
         if IL == 1 and IR == 0:
             movement.slight_left()      #line is to the left
         elif IR == 1 and IL == 0:
@@ -130,31 +120,26 @@ def update():
         else:
             movement.move_forward()
 
-        # only enable arrival detection once back on ordinary line
+        #outer sensors black + a middle sensor on the line = off the junction, back on ordinary line
         if OL == 0 and OR == 0 and (IL == 1 or IR == 1):
-            #change stage to travelling
             stage = "travelling"
         return
 
-#travelling just means that it is following route, so normal line follwowing, continues this until it sees node
+    #travelling - normal line following until the next node
     if stage == "travelling":
-        #give following line next node to see if it expects an endpoint
+        #tell line following the next node, so it knows whether to expect a line end
         result = linefollowing.following_line(next_node)
-        #our line following sends back "node" if it tracks a node
 
-        #if node is detected we need to execute next node to find
+        #reached a node - assume it is the one we were going for
         if result == "node":
-            #assume the next detected node is the expected one, ie. the node we travelled to
-            #update this, direction and node
             came_from = current_node
             current_node = next_node
-            heading = wanted
+            facing = wanted
 
-            #choose the next connection, or finish
+            #plan the next step or finish if this was the target
             plan_connection()
 
-
-    #if robot is lost, stop movement and make stage error
+        #lost the line - stop
         elif result == "lost":
             movement.stop()
             stage = "error"

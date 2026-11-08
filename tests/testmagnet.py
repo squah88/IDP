@@ -1,4 +1,4 @@
-#we need to test the value north and south give for magnet
+#magnet sensor test
 
 import magnetsensor
 import time
